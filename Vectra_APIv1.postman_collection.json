@@ -1,0 +1,761 @@
+{
+	"variables": [],
+	"info": {
+		"name": "Vectra API",
+		"_postman_id": "07d59907-b108-824f-69dc-5bdebac47be7",
+		"description": "",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Detections",
+			"description": "",
+			"item": [
+				{
+					"name": "All detections",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/detections?",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"detections"
+							],
+							"query": [
+								{
+									"key": "c_score",
+									"value": "",
+									"equals": false,
+									"description": "certainty score",
+									"disabled": true
+								},
+								{
+									"key": "c_score_gte",
+									"value": "",
+									"equals": false,
+									"description": "certainty score greater than or equal to",
+									"disabled": true
+								},
+								{
+									"key": "category",
+									"value": "",
+									"equals": false,
+									"description": "detection category",
+									"disabled": true
+								},
+								{
+									"key": "destination",
+									"value": "",
+									"equals": false,
+									"description": "destination in detection detail set",
+									"disabled": true
+								},
+								{
+									"key": "dns_ip",
+									"value": "",
+									"equals": false,
+									"description": "dns ip (dns set)",
+									"disabled": true
+								},
+								{
+									"key": "dns_request",
+									"value": "",
+									"equals": false,
+									"description": "dns request (dns set)",
+									"disabled": true
+								},
+								{
+									"key": "dst_port",
+									"value": "",
+									"equals": false,
+									"description": "destination port",
+									"disabled": true
+								},
+								{
+									"key": "fields",
+									"value": "",
+									"equals": true,
+									"description": "filtered fields in return object",
+									"disabled": true
+								},
+								{
+									"key": "host_id",
+									"value": "",
+									"equals": false,
+									"description": "id of the host object",
+									"disabled": true
+								},
+								{
+									"key": "inbound_dns",
+									"value": "",
+									"equals": false,
+									"description": "inbound dns (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "inbound_ip",
+									"value": "",
+									"equals": false,
+									"description": "inbound ip (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "inbound_port",
+									"value": "",
+									"equals": false,
+									"description": "inbound port (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "inbound_proto",
+									"value": "",
+									"equals": false,
+									"description": "inbound protocol (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "last_timestamp",
+									"value": "",
+									"equals": false,
+									"description": "last timestamp",
+									"disabled": true
+								},
+								{
+									"key": "max_id",
+									"value": "",
+									"equals": false,
+									"description": "id less than or equal to the defined id",
+									"disabled": true
+								},
+								{
+									"key": "min_id",
+									"value": "",
+									"equals": false,
+									"description": "id greater than or equal to the defined id",
+									"disabled": true
+								},
+								{
+									"key": "ordering",
+									"value": "",
+									"equals": false,
+									"description": "field to use  for ordering response",
+									"disabled": true
+								},
+								{
+									"key": "outbound_dns",
+									"value": "",
+									"equals": false,
+									"description": "outbound dns (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "outbound_ip",
+									"value": "",
+									"equals": false,
+									"description": "outbound ip (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "outbound_port",
+									"value": "",
+									"equals": false,
+									"description": "outbound  port  (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "outbound_proto",
+									"value": "",
+									"equals": false,
+									"description": "outbound proto (relay comm)",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "",
+									"equals": false,
+									"description": "page number to return or last ",
+									"disabled": true
+								},
+								{
+									"key": "page_size",
+									"value": "",
+									"equals": true,
+									"description": "number or responses per page or all",
+									"disabled": true
+								},
+								{
+									"key": "proto",
+									"value": "",
+									"equals": false,
+									"description": "protocol",
+									"disabled": true
+								},
+								{
+									"key": "resp",
+									"value": "",
+									"equals": false,
+									"description": "response (dns set)",
+									"disabled": true
+								},
+								{
+									"key": "resp_code",
+									"value": "",
+									"equals": false,
+									"description": "response code (dns set)",
+									"disabled": true
+								},
+								{
+									"key": "src_ip",
+									"value": "",
+									"equals": false,
+									"description": "source ip",
+									"disabled": true
+								},
+								{
+									"key": "state",
+									"value": "",
+									"equals": false,
+									"description": "active, inactive, ignored, ingnored for all",
+									"disabled": true
+								},
+								{
+									"key": "t_score",
+									"value": "",
+									"equals": false,
+									"description": "threat score",
+									"disabled": true
+								},
+								{
+									"key": "t_score_gte",
+									"value": "",
+									"equals": false,
+									"description": "threat score greater than or equal to",
+									"disabled": true
+								},
+								{
+									"key": "tags",
+									"value": "",
+									"equals": false,
+									"description": "tags",
+									"disabled": true
+								},
+								{
+									"key": "type_vname",
+									"value": "",
+									"equals": false,
+									"description": "detection name",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": "Basic API call to retrieve detections"
+					},
+					"response": []
+				},
+				{
+					"name": "Specific detection",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/detections/1",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"detections",
+								"1"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "state",
+									"equals": true,
+									"description": "",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": "Basic API call to retrieve detections"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Health",
+			"description": "",
+			"item": [
+				{
+					"name": "Health",
+					"request": {
+						"url": "https://{{hostname}}/api/health",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": "Enpoint which provides basic information related to the health and statistics of the device"
+					},
+					"response": []
+				},
+				{
+					"name": "Subnets",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": {
+								"username": "{{user}}",
+								"password": "{{password}}",
+								"saveHelperData": true,
+								"showPassword": false
+							}
+						},
+						"url": "https://{{hostname}}/api/health/subnets",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic dmFkbWluOmQxNXR1cmIzZA==",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": "Enpoint which provides basic information related subnets"
+					},
+					"response": []
+				},
+				{
+					"name": "Traffic",
+					"request": {
+						"url": "https://{{hostname}}/api/health/traffic",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": "Enpoint which provides basic information related traffic  "
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Hosts",
+			"description": "",
+			"item": [
+				{
+					"name": "Hosts",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/hosts",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"hosts"
+							],
+							"query": [
+								{
+									"key": "c_score",
+									"value": "",
+									"equals": false,
+									"description": "certaintly score",
+									"disabled": true
+								},
+								{
+									"key": "c_score_gte",
+									"value": "",
+									"equals": false,
+									"description": "certaintly score  greather  than or equal to",
+									"disabled": true
+								},
+								{
+									"key": "fields",
+									"value": "",
+									"equals": false,
+									"description": "filtered fields in return object",
+									"disabled": true
+								},
+								{
+									"key": "key_asset",
+									"value": "",
+									"equals": false,
+									"description": "is device key asset",
+									"disabled": true
+								},
+								{
+									"key": "last_detection_timestamp",
+									"value": "",
+									"equals": false,
+									"description": "timestamp of last detection",
+									"disabled": true
+								},
+								{
+									"key": "last_source",
+									"value": "",
+									"equals": false,
+									"description": "last know ip address",
+									"disabled": true
+								},
+								{
+									"key": "mac_address",
+									"value": "",
+									"equals": false,
+									"description": "mac address of host",
+									"disabled": true
+								},
+								{
+									"key": "ordering",
+									"value": "",
+									"equals": false,
+									"description": "field to use for ordering response",
+									"disabled": true
+								},
+								{
+									"key": "page",
+									"value": "",
+									"equals": false,
+									"description": "number of page to return",
+									"disabled": true
+								},
+								{
+									"key": "page_size",
+									"value": "",
+									"equals": false,
+									"description": "number of objects per page or  all",
+									"disabled": true
+								},
+								{
+									"key": "state",
+									"value": "",
+									"equals": false,
+									"description": "active, inactive, suspended, ignored, ignored4all",
+									"disabled": true
+								},
+								{
+									"key": "t_score",
+									"value": "",
+									"equals": false,
+									"description": "threat score",
+									"disabled": true
+								},
+								{
+									"key": "t_score_gte",
+									"value": "",
+									"equals": false,
+									"description": "threat score greather than or equal to",
+									"disabled": true
+								},
+								{
+									"key": "tags",
+									"value": "",
+									"equals": false,
+									"description": "tags applied to host",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": "Basic API call to retrieve hosts"
+					},
+					"response": []
+				},
+				{
+					"name": "Specific host",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/hosts/1",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"hosts",
+								"1"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "state",
+									"equals": true,
+									"description": "",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": "Basic API call to retrieve hosts"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Rules",
+			"description": "",
+			"item": [
+				{
+					"name": "Rules",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/rules",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"rules"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "",
+									"equals": false,
+									"description": "",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": "Basic API call to retrieve triage rules"
+					},
+					"response": []
+				},
+				{
+					"name": "Specific rule",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/rules/1",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"rules",
+								"1"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "",
+									"equals": false,
+									"description": "",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": "Basic API call to retrieve triage rules"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Sensors",
+			"description": "",
+			"item": [
+				{
+					"name": "Sensors",
+					"request": {
+						"url": {
+							"raw": "https://{{hostname}}/api/sensors",
+							"protocol": "https",
+							"host": [
+								"{{hostname}}"
+							],
+							"path": [
+								"api",
+								"sensors"
+							],
+							"query": [
+								{
+									"key": "fields",
+									"value": "",
+									"equals": false,
+									"description": "",
+									"disabled": true
+								}
+							],
+							"variable": []
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": "Basic API call to retrieve sensors"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Settings",
+			"description": "",
+			"item": [
+				{
+					"name": "Settings",
+					"request": {
+						"url": "https://{{hostname}}/api/settings",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"description": "Basic API call to configuration settings"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Reports",
+			"description": "",
+			"item": [
+				{
+					"name": "Reports",
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": {
+								"username": "{{user}}",
+								"password": "{{password}}",
+								"saveHelperData": true,
+								"showPassword": false
+							}
+						},
+						"url": "https://{{hostname}}/api/reports",
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+								"description": ""
+							}
+						],
+						"body": {},
+						"description": ""
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Test API",
+			"request": {
+				"url": "https://{{hostname}}/api",
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Basic YWRtaW46ZDE1dHVyYjNk",
+						"description": ""
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"description": "Basic API call to test connectivity and authentication"
+			},
+			"response": []
+		}
+	]
+}
