@@ -6,16 +6,13 @@ import requests
 
 def request_error_handler(func):
     def request_handler(self, **kwargs):
-        try:
-            response = func(self, **kwargs)
-        except requests.ConnectionError:
-            raise Exception('Unable to connect to remote host')
+        response = func(self, **kwargs)
 
         if response.status_code in [200, 201]:
             return response
         else:
-            print "Error code: " + str(response.status_code)
-            raise Exception(response.content)
+            # TODO implement execption class to more gracefully hanle exception
+            raise Exception(response.status_code, response.content)
 
     return request_handler
 
