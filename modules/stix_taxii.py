@@ -5,7 +5,7 @@ import string
 
 from cabby import create_client
 from stix.core import STIXPackage
-from cStringIO import StringIO
+from io import StringIO
 
 
 class TaxiiClient(object):
