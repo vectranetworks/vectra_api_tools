@@ -53,7 +53,7 @@ class TaxiiClient(object):
         return compiled_package
 
     @staticmethod
-    def _write_stix_file(stix_package):
+    def write_stix_file(stix_package):
         ext = ''.join([random.choice(string.ascii_letters + string.digits) for n in xrange(10)])
         fd = open('/tmp/stix_' + str(ext), 'w')
         fd.write(stix_package.to_xml(encoding='utf-8'))

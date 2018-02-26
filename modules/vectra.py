@@ -94,7 +94,6 @@ class VectraClient(object):
 
     @request_error_handler
     def get_hosts(self, **kwargs):
-        # TODO convert to generator or create new method get_all_hosts()
         """
         Query all hosts - all parameters are optional
         :param active_traffic: host has active traffic (bool)
@@ -187,7 +186,6 @@ class VectraClient(object):
 
     @request_error_handler
     def get_detections(self, **kwargs):
-        # TODO convert to generator or create new metho get_all_detections()
         """
         Query all detections - all paramters are optional
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
