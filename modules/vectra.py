@@ -316,8 +316,7 @@ class VectraClient(object):
                 if feed['name'].lower() == name.lower():
                     return feed['id']
         else:
-            print "Error code: " + str(response.status_code)
-            raise Exception(response.content)
+            raise Exception(response.status_code, response.content)
 
     @validate_api_v2
     @request_error_handler
