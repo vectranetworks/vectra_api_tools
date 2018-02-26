@@ -1,6 +1,11 @@
+import pytest
 import requests
 
 requests.packages.urllib3.disable_warnings()
+
+
+if not pytest.config.getoption('--token'):
+    pytest.skip('v1 client not configured', allow_module_level=True)
 
 
 def test_get_feeds(vc_v2):
