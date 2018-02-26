@@ -8,7 +8,7 @@ from stix.core import STIXPackage
 from cStringIO import StringIO
 
 
-class TaxiClient(object):
+class TaxiiClient(object):
     def __init__(self, url=None, discovery_path=None, https=True, username=None, password=None, cert=None, key=None):
         self.client = create_client(url, use_https=https, discovery_path=discovery_path)
         self.client.set_auth(username=username, password=password, cert_file=cert, key_file=key)
