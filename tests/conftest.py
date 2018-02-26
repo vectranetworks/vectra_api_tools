@@ -7,22 +7,6 @@ def pytest_addoption(parser):
     parser.addoption('--password', help='password')
     parser.addoption('--token', help='token')
 
-# @pytest.fixture
-# def url(request):
-#     return request.config.getoption('--url')
-#
-# @pytest.fixture
-# def user(request):
-#     return request.config.getoption('--user')
-#
-# @pytest.fixture
-# def password(request):
-#     return request.config.getoption('--password')
-#
-# @pytest.fixture
-# def token(request):
-#     return request.config.getoption('--token')
-
 @pytest.fixture
 def vc_v1(request):
     brain = request.config.getoption('--url')
