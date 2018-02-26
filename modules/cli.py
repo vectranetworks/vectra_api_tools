@@ -14,7 +14,7 @@ def commonArgs(parser):
     parser.add_argument('--size',
                         dest='page_size',
                         help='number of results to return per page (default: %(default)s)',
-                        default=500)
+                        default=5000)
     parser.add_argument('--state',
                         choices=['active', 'inactive'],
                         help='state of object (default: %(default)s)',
