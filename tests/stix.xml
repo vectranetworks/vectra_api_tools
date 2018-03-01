@@ -1,0 +1,103 @@
+
+<stix:STIX_Package 
+	xmlns:cyboxCommon="http://cybox.mitre.org/common-2"
+	xmlns:cybox="http://cybox.mitre.org/cybox-2"
+	xmlns:cyboxVocabs="http://cybox.mitre.org/default_vocabularies-2"
+	xmlns:AddressObj="http://cybox.mitre.org/objects#AddressObject-2"
+	xmlns:URIObj="http://cybox.mitre.org/objects#URIObject-2"
+	xmlns:marking="http://data-marking.mitre.org/Marking-1"
+	xmlns:tlpMarking="http://data-marking.mitre.org/extensions/MarkingStructure#TLP-1"
+	xmlns:TOUMarking="http://data-marking.mitre.org/extensions/MarkingStructure#Terms_Of_Use-1"
+	xmlns:indicator="http://stix.mitre.org/Indicator-2"
+	xmlns:stixCommon="http://stix.mitre.org/common-1"
+	xmlns:stixVocabs="http://stix.mitre.org/default_vocabularies-1"
+	xmlns:stix="http://stix.mitre.org/stix-1"
+	xmlns:NCCIC="http://www.us-cert.gov/nccic"
+    xmlns:CISCP="http://us-cert.gov/ciscp"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+	http://cybox.mitre.org/common-2 http://cybox.mitre.org/XMLSchema/common/2.1/cybox_common.xsd
+	http://cybox.mitre.org/cybox-2 http://cybox.mitre.org/XMLSchema/core/2.1/cybox_core.xsd
+	http://cybox.mitre.org/default_vocabularies-2 http://cybox.mitre.org/XMLSchema/default_vocabularies/2.1/cybox_default_vocabularies.xsd
+	http://cybox.mitre.org/objects#AddressObject-2 http://cybox.mitre.org/XMLSchema/objects/Address/2.1/Address_Object.xsd
+	http://cybox.mitre.org/objects#URIObject-2 http://cybox.mitre.org/XMLSchema/objects/URI/2.1/URI_Object.xsd
+	http://data-marking.mitre.org/Marking-1 http://stix.mitre.org/XMLSchema/data_marking/1.1.1/data_marking.xsd
+	http://data-marking.mitre.org/extensions/MarkingStructure#TLP-1 http://stix.mitre.org/XMLSchema/extensions/marking/tlp/1.1.1/tlp_marking.xsd
+	http://data-marking.mitre.org/extensions/MarkingStructure#Terms_Of_Use-1 http://stix.mitre.org/XMLSchema/extensions/marking/terms_of_use/1.0.1/terms_of_use_marking.xsd
+	http://stix.mitre.org/Indicator-2 http://stix.mitre.org/XMLSchema/indicator/2.1.1/indicator.xsd
+	http://stix.mitre.org/common-1 http://stix.mitre.org/XMLSchema/common/1.1.1/stix_common.xsd
+	http://stix.mitre.org/default_vocabularies-1 http://stix.mitre.org/XMLSchema/default_vocabularies/1.1.1/stix_default_vocabularies.xsd
+	http://stix.mitre.org/stix-1 http://stix.mitre.org/XMLSchema/core/1.1.1/stix_core.xsd
+    http://us-cert.gov/ciscp http://www.us-cert.gov/sites/default/files/STIX_Namespace/ciscp_vocab_v1.1.1.xsd"
+     id="..." version="1.1.1" timestamp="2017-12-21T14:21:32.995000+00:00">
+    <stix:STIX_Header>
+        <stix:Title>Potential Credential Harvesting Website identified in HealthCare Sector</stix:Title>
+        <stix:Package_Intent xsi:type="stixVocabs:PackageIntentVocab-1.0">Indicators - Phishing</stix:Package_Intent>
+        <stix:Description>According to a trusted third party, ... </stix:Description>
+        <stix:Handling>
+            <marking:Marking>
+                <marking:Controlled_Structure>//node() | //@*</marking:Controlled_Structure>
+                <marking:Marking_Structure xsi:type='TOUMarking:TermsOfUseMarkingStructureType'>
+                    <TOUMarking:Terms_Of_Use>DISCLAIMER: This report is provided "as is" for informational purposes only...</TOUMarking:Terms_Of_Use>
+                </marking:Marking_Structure>
+                <marking:Marking_Structure xsi:type='tlpMarking:TLPMarkingStructureType' color="AMBER"/>
+            </marking:Marking>
+        </stix:Handling>
+        <stix:Information_Source>
+            <stixCommon:Time>
+                <cyboxCommon:Produced_Time>2017-12-21T14:19:36+00:00</cyboxCommon:Produced_Time>
+            </stixCommon:Time>
+        </stix:Information_Source>
+    </stix:STIX_Header>
+    <stix:Indicators>
+        <stix:Indicator id="indicator-..." timestamp="2017-12-21T14:21:32.996000+00:00" xsi:type='indicator:IndicatorType'>
+            <indicator:Title>Malicious URL Indicator</indicator:Title>
+            <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.1">Domain Watchlist</indicator:Type>
+            <indicator:Description>According to a trusted third party...</indicator:Description>
+            <indicator:Observable id="NCCIC:Observable-...">
+                <cybox:Object id="NCCIC:Object-...">
+                    <cybox:Properties xsi:type="URIObj:URIObjectType" type="URL">
+                        <URIObj:Value condition="Equals">_._._._</URIObj:Value>
+                    </cybox:Properties>
+                </cybox:Object>
+            </indicator:Observable>
+            <indicator:Kill_Chain_Phases>
+                <stixCommon:Kill_Chain_Phase ordinality="1" name="Reconnaissance" phase_id="stix:KillChainPhase-..." kill_chain_id="stix:KillChainPhase-..."/>
+            </indicator:Kill_Chain_Phases>
+            <indicator:Sightings sightings_count="1">
+                <indicator:Sighting timestamp="2017-03-15T00:00:00"/>
+            </indicator:Sightings>
+        </stix:Indicator>
+        <stix:Indicator id="indicator-..." timestamp="2017-12-21T14:21:32.996000+00:00" xsi:type='indicator:IndicatorType'>
+            <indicator:Title>Malicious IPv4 Indicator</indicator:Title>
+            <indicator:Type xsi:type="stixVocabs:IndicatorTypeVocab-1.1">IP Watchlist</indicator:Type>
+            <indicator:Description>According to open source research...</indicator:Description>
+            <indicator:Observable id="NCCIC:Observable-...">
+                <cybox:Object id="NCCIC:Object-...">
+                    <cybox:Properties xsi:type="AddressObj:AddressObjectType" category="ipv4-addr" is_spoofed="false">
+                        <AddressObj:Address_Value condition="Equals">_._._._</AddressObj:Address_Value>
+                    </cybox:Properties>
+                </cybox:Object>
+            </indicator:Observable>
+            <indicator:Kill_Chain_Phases>
+                <stixCommon:Kill_Chain_Phase ordinality="1" name="Reconnaissance" phase_id="stix:KillChainPhase-..." kill_chain_id="stix:KillChainPhase-..."/>
+            </indicator:Kill_Chain_Phases>
+            <indicator:Sightings sightings_count="1">
+                <indicator:Sighting timestamp="2017-03-15T00:00:00"/>
+            </indicator:Sightings>
+        </stix:Indicator>
+    </stix:Indicators>
+    <stix:TTPs>
+        <stix:Kill_Chains>
+            <stixCommon:Kill_Chain reference="http://www.lockheedmartin.com/content/dam/lockheed/data/corporate/documents/LM-White-Paper-Intel-Driven-Defense.pdf" number_of_phases="7" id="stix:KillChainPhase-af3e707f-2fb9-49e5-8c37-14026ca0a5ff" definer="LMCO" name="LM Cyber Kill Chain">
+                <stixCommon:Kill_Chain_Phase ordinality="1" name="Reconnaissance" phase_id="stix:KillChainPhase-..."/>
+                <stixCommon:Kill_Chain_Phase ordinality="2" name="Weaponization" phase_id="stix:KillChainPhase-..."/>
+                <stixCommon:Kill_Chain_Phase ordinality="3" name="Delivery" phase_id="stix:KillChainPhase-..."/>
+                <stixCommon:Kill_Chain_Phase ordinality="4" name="Exploitation" phase_id="stix:KillChainPhase-..."/>
+                <stixCommon:Kill_Chain_Phase ordinality="5" name="Installation" phase_id="stix:KillChainPhase-..."/>
+                <stixCommon:Kill_Chain_Phase ordinality="6" name="Command and Control" phase_id="stix:KillChainPhase-..."/>
+                <stixCommon:Kill_Chain_Phase ordinality="7" name="Actions on Objectives" phase_id="stix:KillChainPhase-..."/>
+            </stixCommon:Kill_Chain>
+        </stix:Kill_Chains>
+    </stix:TTPs>
+</stix:STIX_Package>
