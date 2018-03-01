@@ -56,12 +56,12 @@ class VectraClient(object):
         self.verify = verify
 
         if token:
-            self.url = url + '/api/v2'
+            self.url = '{url}/api/v2'.format(url=url)
             self.headers = {
                 'Authorization': "Token " + token.strip(),
             }
         elif user and password:
-            self.url = url + '/api'
+            self.url = '{url}/api'.format(url=url)
             self.auth = (user, password)
             deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
                         ' when possible')
@@ -136,11 +136,11 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get(self.url + '/hosts', headers=self.headers,
+            return requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/hosts', auth=self.auth, params=self._generate_host_params(kwargs),
-                                verify=self.verify)
+            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth, 
+                                params=self._generate_host_params(kwargs), verify=self.verify)
 
     def get_all_hosts(self, **kwargs):
         """
@@ -166,10 +166,10 @@ class VectraClient(object):
             raise Exception('Host id required')
 
         if self.version == 2:
-            return requests.get(self.url + '/hosts/' + str(host_id), headers=self.headers,
+            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/hosts/' + str(host_id), auth=self.auth,
+            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
     @validate_api_v2
@@ -182,7 +182,7 @@ class VectraClient(object):
         """
 
         if not host_id:
-            raise Exception('Host id required')
+            raise ValueError('Host id required')
 
         headers = self.headers
         headers.update({
@@ -194,7 +194,7 @@ class VectraClient(object):
         else:
             payload = 'key_asset=False'
 
-        return requests.patch(self.url + '/hosts/' + str(host_id), headers=headers, data=payload,
+        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=headers, data=payload,
                               verify=self.verify)
 
     @request_error_handler
@@ -225,10 +225,10 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get(self.url + '/detections', headers=self.headers,
+            return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/detections', auth=self.auth, params=self._generate_host_params(kwargs),
+            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth, params=self._generate_host_params(kwargs),
                                 verify=self.verify)
 
     def get_all_detections(self, **kwargs):
@@ -255,10 +255,10 @@ class VectraClient(object):
             raise Exception('Detection id required')
 
         if self.version == 2:
-            return requests.get(self.url + '/detections/' + str(detection_id), headers=self.headers,
+            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/detections/' + str(detection_id), auth=self.auth,
+            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
     @validate_api_v2
@@ -293,7 +293,7 @@ class VectraClient(object):
             'Cache-Control': "no-cache"
         })
 
-        return requests.post(self.url + '/threatFeeds', data=json.dumps(payload), headers=headers,
+        return requests.post('{url}/threatFeeds'.format(url=self.url), data=json.dumps(payload), headers=headers,
                              verify=self.verify)
 
     @validate_api_v2
@@ -303,7 +303,8 @@ class VectraClient(object):
         Deletes threat feed from Vectra
         :param feed_id: id of threat feed (returned by get_feed_by_name())
         """
-        return requests.delete(self.url + '/api/v2/threatFeeds/' + str(feed_id), headers=self.headers, verify=self.verify)
+        return requests.delete('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id),
+                               headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -311,7 +312,7 @@ class VectraClient(object):
         """
         Gets list of currently configured threat feeds
         """
-        return requests.get(self.url + '/threatFeeds', headers=self.headers, verify=self.verify)
+        return requests.get('{url}/threatFeeds'.format(url=self.url), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_feed_by_name(self, name=None):
@@ -320,7 +321,7 @@ class VectraClient(object):
         :param name: name of threat feed
         """
         try:
-            response = requests.get(self.url + '/threatFeeds', headers=self.headers, verify=self.verify)
+            response = requests.get('{url}/threatFeeds'.format(url=self.url), headers=self.headers, verify=self.verify)
         except requests.ConnectionError:
             raise Exception('Unable to connect to remote host')
 
@@ -339,7 +340,8 @@ class VectraClient(object):
         :param feed_id: id of threat feed (returned by get_feed_by_name)
         :param stix_file: stix filename
         """
-        return requests.post(self.url + '/threatFeeds/' + str(feed_id), headers=self.headers, files={'file': open(stix_file)}, verify=self.verify)
+        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
+                             files={'file': open(stix_file)}, verify=self.verify)
 
     @request_error_handler
     def custom_endpoint(self, path=None, **kwargs):
