@@ -45,6 +45,3 @@ def test_key_asset(vc_v2):
 
     vc_v2.set_key_asset(host_id=host_id, set=ka)
 
-
-# TODO test key asset hostname and ip input
-# TODO test key assets file input
