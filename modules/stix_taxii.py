@@ -2,10 +2,17 @@ import datetime
 import pytz
 import random
 import string
+import sys
 
 from cabby import create_client
 from stix.core import STIXPackage
-from cStringIO import StringIO
+
+if sys.version_info.major == 2:
+    pyversion = 2
+    import cStringIO.StringIO as IOhandler
+if sys.version_info.major == 3:
+    pyversion = 3
+    from io import BytesIO as IOhandler
 
 
 class TaxiiClient(object):
@@ -44,7 +51,7 @@ class TaxiiClient(object):
     def _generate_stix_package(packages):
         compiled_package = STIXPackage()
         for package in packages:
-            sio = StringIO(package.content)
+            sio = IOhandler(package.content)
             sp = STIXPackage.from_xml(sio)
             if sp.indicators:
                 [compiled_package.add_indicator(ind) for ind in sp.indicators]
@@ -54,8 +61,11 @@ class TaxiiClient(object):
 
     @staticmethod
     def write_stix_file(stix_package, dir='/tmp'):
-        ext = ''.join([random.choice(string.ascii_letters + string.digits) for n in xrange(10)])
+        ext = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
         fd = open('{0}/stix_{1}'.format(dir, str(ext)), 'w')
-        fd.write(stix_package.to_xml(encoding='utf-8'))
+        if pyversion == 2:
+            fd.write(stix_package.to_xml(encoding='utf-8'))
+        if pyversion == 3:
+            fd.write(stix_package.to_xml(encoding='utf-8').decode())
         fd.close()
         return fd.name
