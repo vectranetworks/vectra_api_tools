@@ -1,7 +1,9 @@
 import json
 import requests
+import warnings
 
 # requests.packages.urllib3.disable_warnings()
+warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 
 def request_error_handler(func):
@@ -11,7 +13,7 @@ def request_error_handler(func):
         if response.status_code in [200, 201]:
             return response
         else:
-            # TODO implement execption class to more gracefully hanle exception
+            # TODO implement exception class to more gracefully handle exception
             raise Exception(response.status_code, response.content)
 
     return request_handler
@@ -22,9 +24,18 @@ def validate_api_v2(func):
         if self.version == 2:
             return func(self, **kwargs)
         else:
-            raise Exception('Method only accessible via v2 of API')
+            raise NotImplementedError('Method only accessible via v2 of API')
 
     return api_validator
+
+
+def deprecation(message):
+    warnings.warn(message, PendingDeprecationWarning)
+
+
+def param_deprecation(key):
+    message = '{0} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'.format(key)
+    warnings.warn(message, PendingDeprecationWarning)
 
 
 class VectraClient(object):
@@ -52,9 +63,11 @@ class VectraClient(object):
         elif user and password:
             self.url = url + '/api'
             self.auth = (user, password)
+            deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
+                        ' when possible')
         else:
-            raise Exception("At least one form of authentication is required. "
-                            "Please provide a token or username and password")
+            raise RuntimeError("At least one form of authentication is required. Please provide a token or username"
+                               " and password")
 
     @staticmethod
     def _generate_host_params(args):
@@ -68,10 +81,10 @@ class VectraClient(object):
                       'has_active_traffic', 'include_detection_summaries', 'is_key_asset', 'is_targeting_key_asset',
                       'key_asset', 'last_source', 'mac_address', 'name', 'ordering', 'page', 'page_size', 'state',
                       't_score', 't_score_gte', 'tags', 'threat', 'threat_gte', 'targets_key_asset']
+        deprecated_keys = ['c_score', 'c_score_gte', 'key_asset', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
-            # TODO log deprecated keys
             if k in valid_keys and v is not None: params[k] = v
-
+            if k in deprecated_keys: param_deprecation(k)
         return params
 
     @staticmethod
@@ -86,10 +99,10 @@ class VectraClient(object):
                       'detection_category', 'fields', 'host_id', 'is_targeting_key_asset', 'is_triaged', 'ordering',
                       'page', 'page_size', 'src_ip', 'state', 't_score', 't_score_gte', 'tags', 'targets_key_asset',
                       'threat', 'threat_gte']
+        deprecated_keys = ['c_score', 'c_score_gte', 'category', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
-            # TODO log deprecated keys
             if k in valid_keys and v is not None: params[k] = v
-
+            if k in deprecated_keys: param_deprecation(k)
         return params
 
     @request_error_handler
