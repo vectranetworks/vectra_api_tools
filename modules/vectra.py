@@ -197,6 +197,36 @@ class VectraClient(object):
         return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=headers, data=payload,
                               verify=self.verify)
 
+    @validate_api_v2
+    @request_error_handler
+    def get_host_tags(self, host_id=None):
+        return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_host_tags(self, host_id=None, tags=[], append=False):
+        if append and type(tags) == list:
+            current_list = self.get_host_tags(host_id=host_id).json()['tags']
+            payload = {
+                "tags": current_list + tags
+            }
+        elif type(tags) == list:
+            payload = {
+                "tags": tags
+            }
+        else:
+            raise TypeError('tags must be of type list')
+
+        headers = self.headers
+        headers.update({
+            'Content-Type': "application/json",
+            'Cache-Control': "no-cache"
+        })
+
+        return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=headers,
+                              data=json.dumps(payload), verify=self.verify)
+
     @request_error_handler
     def get_detections(self, **kwargs):
         """
@@ -248,7 +278,7 @@ class VectraClient(object):
     def get_detection_by_id(self, detection_id=None, **kwargs):
         """
         Get detection by id
-        :param det_id: detection id - required
+        :param detection_id: detection id - required
         :param fields: comma separated string of fields to be filtered and returned
         """
         if not detection_id:
@@ -260,6 +290,36 @@ class VectraClient(object):
         else:
             return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def get_detection_tags(self, detection_id=None):
+        return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_detection_tags(self, detection_id=None, tags=[], append=False):
+        if append and type(tags) == list:
+            current_list = self.get_detection_tags(host_id=detection_id).json()['tags']
+            payload = {
+                "tags": current_list + tags
+            }
+        elif type(tags) == list:
+            payload = {
+                "tags": tags
+            }
+        else:
+            raise TypeError('tags must be of type list')
+
+        headers = self.headers
+        headers.update({
+            'Content-Type': "application/json",
+            'Cache-Control': "no-cache"
+        })
+
+        return requests.patch('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=headers,
+                              data=json.dumps(payload), verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
