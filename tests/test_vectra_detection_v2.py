@@ -28,3 +28,18 @@ def test_detection_id(vc_v2):
     result = vc_v2.get_detection_by_id(detection_id=det_id)
 
     assert result.json()['id'] == det_id
+
+
+def test_detection_tags(vc_v2):
+    detection = vc_v2.get_detections().json()['results'][0]
+    detection_id = detection['id']
+    detection_tags = detection['tags']
+
+    vc_v2.set_detection_tags(detection_id=detection_id, tags=['pytest'])
+    assert vc_v2.get_detection_tags(detection_id=detection_id).json()['tags'] == ['pytest']
+
+    vc_v2.set_detection_tags(detection_id=detection_id, tags=['foo', 'bar'], append=True)
+    assert vc_v2.get_detection_tags(detection_id=detection_id).json()['tags'] == ['pytest', 'foo', 'bar']
+
+    vc_v2.set_detection_tags(detection_id=detection_id, tags=detection_tags)
+    assert vc_v2.get_detection_tags(detection_id=detection_id).json()['tags'] == detection_tags
