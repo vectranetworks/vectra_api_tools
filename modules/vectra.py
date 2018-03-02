@@ -301,7 +301,7 @@ class VectraClient(object):
     @request_error_handler
     def set_detection_tags(self, detection_id=None, tags=[], append=False):
         if append and type(tags) == list:
-            current_list = self.get_detection_tags(host_id=detection_id).json()['tags']
+            current_list = self.get_detection_tags(detection_id=detection_id).json()['tags']
             payload = {
                 "tags": current_list + tags
             }
