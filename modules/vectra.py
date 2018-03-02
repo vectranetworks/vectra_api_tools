@@ -200,12 +200,24 @@ class VectraClient(object):
     @validate_api_v2
     @request_error_handler
     def get_host_tags(self, host_id=None):
+        """
+        Get host ags
+        :param host_id: 
+        """
         return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
                             verify=False)
 
     @validate_api_v2
     @request_error_handler
     def set_host_tags(self, host_id=None, tags=[], append=False):
+        """
+        Set host tags
+        :param host_id: 
+        :param tags: list of tags to add to host
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        Set to empty list to clear tags (default: False)
+        :return: 
+        """
         if append and type(tags) == list:
             current_list = self.get_host_tags(host_id=host_id).json()['tags']
             payload = {
@@ -294,12 +306,23 @@ class VectraClient(object):
     @validate_api_v2
     @request_error_handler
     def get_detection_tags(self, detection_id=None):
+        """
+        Get detection tags
+        :param detection_id:
+        """
         return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
                             verify=False)
 
     @validate_api_v2
     @request_error_handler
     def set_detection_tags(self, detection_id=None, tags=[], append=False):
+        """
+        Set  detection tags
+        :param detection_id: 
+        :param tags: list of tags to add to detection
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        Set to empty list to clear all tags (default: False)
+        """
         if append and type(tags) == list:
             current_list = self.get_detection_tags(detection_id=detection_id).json()['tags']
             payload = {
