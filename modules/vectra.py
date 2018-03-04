@@ -1,7 +1,9 @@
 import json
 import requests
+import warnings
 
 # requests.packages.urllib3.disable_warnings()
+warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 
 def request_error_handler(func):
@@ -11,7 +13,7 @@ def request_error_handler(func):
         if response.status_code in [200, 201]:
             return response
         else:
-            # TODO implement execption class to more gracefully hanle exception
+            # TODO implement exception class to more gracefully handle exception
             raise Exception(response.status_code, response.content)
 
     return request_handler
@@ -22,9 +24,18 @@ def validate_api_v2(func):
         if self.version == 2:
             return func(self, **kwargs)
         else:
-            raise Exception('Method only accessible via v2 of API')
+            raise NotImplementedError('Method only accessible via v2 of API')
 
     return api_validator
+
+
+def deprecation(message):
+    warnings.warn(message, PendingDeprecationWarning)
+
+
+def param_deprecation(key):
+    message = '{0} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'.format(key)
+    warnings.warn(message, PendingDeprecationWarning)
 
 
 class VectraClient(object):
@@ -45,16 +56,18 @@ class VectraClient(object):
         self.verify = verify
 
         if token:
-            self.url = url + '/api/v2'
+            self.url = '{url}/api/v2'.format(url=url)
             self.headers = {
                 'Authorization': "Token " + token.strip(),
             }
         elif user and password:
-            self.url = url + '/api'
+            self.url = '{url}/api'.format(url=url)
             self.auth = (user, password)
+            deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
+                        ' when possible')
         else:
-            raise Exception("At least one form of authentication is required. "
-                            "Please provide a token or username and password")
+            raise RuntimeError("At least one form of authentication is required. Please provide a token or username"
+                               " and password")
 
     @staticmethod
     def _generate_host_params(args):
@@ -68,10 +81,10 @@ class VectraClient(object):
                       'has_active_traffic', 'include_detection_summaries', 'is_key_asset', 'is_targeting_key_asset',
                       'key_asset', 'last_source', 'mac_address', 'name', 'ordering', 'page', 'page_size', 'state',
                       't_score', 't_score_gte', 'tags', 'threat', 'threat_gte', 'targets_key_asset']
+        deprecated_keys = ['c_score', 'c_score_gte', 'key_asset', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
-            # TODO log deprecated keys
             if k in valid_keys and v is not None: params[k] = v
-
+            if k in deprecated_keys: param_deprecation(k)
         return params
 
     @staticmethod
@@ -86,10 +99,10 @@ class VectraClient(object):
                       'detection_category', 'fields', 'host_id', 'is_targeting_key_asset', 'is_triaged', 'ordering',
                       'page', 'page_size', 'src_ip', 'state', 't_score', 't_score_gte', 'tags', 'targets_key_asset',
                       'threat', 'threat_gte']
+        deprecated_keys = ['c_score', 'c_score_gte', 'category', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
-            # TODO log deprecated keys
             if k in valid_keys and v is not None: params[k] = v
-
+            if k in deprecated_keys: param_deprecation(k)
         return params
 
     @request_error_handler
@@ -123,11 +136,11 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get(self.url + '/hosts', headers=self.headers,
+            return requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/hosts', auth=self.auth, params=self._generate_host_params(kwargs),
-                                verify=self.verify)
+            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth, 
+                                params=self._generate_host_params(kwargs), verify=self.verify)
 
     def get_all_hosts(self, **kwargs):
         """
@@ -153,10 +166,10 @@ class VectraClient(object):
             raise Exception('Host id required')
 
         if self.version == 2:
-            return requests.get(self.url + '/hosts/' + str(host_id), headers=self.headers,
+            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/hosts/' + str(host_id), auth=self.auth,
+            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
     @validate_api_v2
@@ -169,7 +182,7 @@ class VectraClient(object):
         """
 
         if not host_id:
-            raise Exception('Host id required')
+            raise ValueError('Host id required')
 
         headers = self.headers
         headers.update({
@@ -181,8 +194,50 @@ class VectraClient(object):
         else:
             payload = 'key_asset=False'
 
-        return requests.patch(self.url + '/hosts/' + str(host_id), headers=headers, data=payload,
+        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=headers, data=payload,
                               verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def get_host_tags(self, host_id=None):
+        """
+        Get host ags
+        :param host_id: 
+        """
+        return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_host_tags(self, host_id=None, tags=[], append=False):
+        """
+        Set host tags
+        :param host_id: 
+        :param tags: list of tags to add to host
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        Set to empty list to clear tags (default: False)
+        :return: 
+        """
+        if append and type(tags) == list:
+            current_list = self.get_host_tags(host_id=host_id).json()['tags']
+            payload = {
+                "tags": current_list + tags
+            }
+        elif type(tags) == list:
+            payload = {
+                "tags": tags
+            }
+        else:
+            raise TypeError('tags must be of type list')
+
+        headers = self.headers
+        headers.update({
+            'Content-Type': "application/json",
+            'Cache-Control': "no-cache"
+        })
+
+        return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=headers,
+                              data=json.dumps(payload), verify=self.verify)
 
     @request_error_handler
     def get_detections(self, **kwargs):
@@ -212,10 +267,10 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get(self.url + '/detections', headers=self.headers,
+            return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/detections', auth=self.auth, params=self._generate_host_params(kwargs),
+            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth, params=self._generate_host_params(kwargs),
                                 verify=self.verify)
 
     def get_all_detections(self, **kwargs):
@@ -235,18 +290,59 @@ class VectraClient(object):
     def get_detection_by_id(self, detection_id=None, **kwargs):
         """
         Get detection by id
-        :param det_id: detection id - required
+        :param detection_id: detection id - required
         :param fields: comma separated string of fields to be filtered and returned
         """
         if not detection_id:
             raise Exception('Detection id required')
 
         if self.version == 2:
-            return requests.get(self.url + '/detections/' + str(detection_id), headers=self.headers,
+            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get(self.url + '/detections/' + str(detection_id), auth=self.auth,
+            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def get_detection_tags(self, detection_id=None):
+        """
+        Get detection tags
+        :param detection_id:
+        """
+        return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_detection_tags(self, detection_id=None, tags=[], append=False):
+        """
+        Set  detection tags
+        :param detection_id: 
+        :param tags: list of tags to add to detection
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        Set to empty list to clear all tags (default: False)
+        """
+        if append and type(tags) == list:
+            current_list = self.get_detection_tags(detection_id=detection_id).json()['tags']
+            payload = {
+                "tags": current_list + tags
+            }
+        elif type(tags) == list:
+            payload = {
+                "tags": tags
+            }
+        else:
+            raise TypeError('tags must be of type list')
+
+        headers = self.headers
+        headers.update({
+            'Content-Type': "application/json",
+            'Cache-Control': "no-cache"
+        })
+
+        return requests.patch('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=headers,
+                              data=json.dumps(payload), verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -280,7 +376,7 @@ class VectraClient(object):
             'Cache-Control': "no-cache"
         })
 
-        return requests.post(self.url + '/threatFeeds', data=json.dumps(payload), headers=headers,
+        return requests.post('{url}/threatFeeds'.format(url=self.url), data=json.dumps(payload), headers=headers,
                              verify=self.verify)
 
     @validate_api_v2
@@ -290,7 +386,8 @@ class VectraClient(object):
         Deletes threat feed from Vectra
         :param feed_id: id of threat feed (returned by get_feed_by_name())
         """
-        return requests.delete(self.url + '/api/v2/threatFeeds/' + str(feed_id), headers=self.headers, verify=self.verify)
+        return requests.delete('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id),
+                               headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -298,7 +395,7 @@ class VectraClient(object):
         """
         Gets list of currently configured threat feeds
         """
-        return requests.get(self.url + '/threatFeeds', headers=self.headers, verify=self.verify)
+        return requests.get('{url}/threatFeeds'.format(url=self.url), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_feed_by_name(self, name=None):
@@ -307,7 +404,7 @@ class VectraClient(object):
         :param name: name of threat feed
         """
         try:
-            response = requests.get(self.url + '/threatFeeds', headers=self.headers, verify=self.verify)
+            response = requests.get('{url}/threatFeeds'.format(url=self.url), headers=self.headers, verify=self.verify)
         except requests.ConnectionError:
             raise Exception('Unable to connect to remote host')
 
@@ -326,7 +423,8 @@ class VectraClient(object):
         :param feed_id: id of threat feed (returned by get_feed_by_name)
         :param stix_file: stix filename
         """
-        return requests.post(self.url + '/threatFeeds/' + str(feed_id), headers=self.headers, files={'file': open(stix_file)}, verify=self.verify)
+        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
+                             files={'file': open(stix_file)}, verify=self.verify)
 
     @request_error_handler
     def custom_endpoint(self, path=None, **kwargs):

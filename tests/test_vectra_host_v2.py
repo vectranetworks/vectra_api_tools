@@ -46,5 +46,17 @@ def test_key_asset(vc_v2):
     vc_v2.set_key_asset(host_id=host_id, set=ka)
 
 
-# TODO test key asset hostname and ip input
-# TODO test key assets file input
+def test_host_tags(vc_v2):
+    host = vc_v2.get_hosts().json()['results'][0]
+    host_id = host['id']
+    host_tags = host['tags']
+
+    vc_v2.set_host_tags(host_id=host_id, tags=['pytest'])
+    assert vc_v2.get_host_tags(host_id=host_id).json()['tags'] == ['pytest']
+
+    vc_v2.set_host_tags(host_id=host_id, tags=['foo', 'bar'], append=True)
+    assert vc_v2.get_host_tags(host_id=host_id).json()['tags'] == ['pytest', 'foo', 'bar']
+
+    vc_v2.set_host_tags(host_id=host_id, tags=host_tags)
+    assert vc_v2.get_host_tags(host_id=host_id).json()['tags'] == host_tags
+
