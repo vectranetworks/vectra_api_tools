@@ -270,8 +270,8 @@ class VectraClient(object):
             return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth, params=self._generate_host_params(kwargs),
-                                verify=self.verify)
+            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth, 
+                                params=self._generate_detection_params(kwargs), verify=self.verify)
 
     def get_all_detections(self, **kwargs):
         """
