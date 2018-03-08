@@ -346,6 +346,16 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
+    def get_rules(self):
+        """
+        Get detection tags
+        :param detection_id:
+        """
+        return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
         Creates new threat feed
