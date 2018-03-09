@@ -105,6 +105,15 @@ class VectraClient(object):
             if k in deprecated_keys: param_deprecation(k)
         return params
 
+    def _transform_hosts(self, host_list):
+        transformed_list = []
+        for host in host_list:
+            if isinstance(host, int) or not host.startswith("http"):
+                transformed_list.append("{url}/hosts/{id}".format(url=self.url, id=host))
+            else:
+                transformed_list.append(host)
+        return transformed_list
+
     @request_error_handler
     def get_hosts(self, **kwargs):
         """
@@ -408,7 +417,7 @@ class VectraClient(object):
 
         # TODO migrate detection to detection_type
         # TODO change description to name
-        body = {
+        payload = {
             "all_hosts": all_hosts,
             "detection_category": detection_category,
             "detection": detection_type,
@@ -418,22 +427,16 @@ class VectraClient(object):
         }
 
         if host and not all_hosts:
-            transformed_list = []
-            for host_ref in host:
-                if host_ref.startswith("http"):
-                    transformed_list.append(host_ref)
-                else:
-                    transformed_list.append("{url}/hosts/{id}".format(url=self.url, id=host_ref))
-            body['host'] = transformed_list
+            payload['host'] = self._transform_hosts(host)
         elif ip and not all_hosts:
-            body['ip'] = ip
+            payload['ip'] = ip
         elif sensor_luid and not  all_hosts:
-            body['sensor_luid'] = sensor_luid
+            payload['sensor_luid'] = sensor_luid
 
         for k, v in kwargs.items():
-            body[k] = v
+            payload[k] = v
 
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=body,
+        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
                              verify=False)
 
     @validate_api_v2
