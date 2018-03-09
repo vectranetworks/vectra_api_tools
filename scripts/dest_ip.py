@@ -81,6 +81,6 @@ if args['summary'] == 'total':
                 dstDict[detection_detail['dst_ip']] = 1
 
 #    pprint.pprint(srcDict)
-    print('\n\n{:*<40}{:*<5}'.format('Source', 'Count'))
+    print('\n\n{:*<40}{:*<5}'.format('Destination', 'Count'))
     for key, value in sorted(dstDict.iteritems(), key=lambda (k, v): v, reverse=True):
         print('{:<40}{:<5}'.format(key, value))
