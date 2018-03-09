@@ -216,7 +216,6 @@ class VectraClient(object):
         :param tags: list of tags to add to host
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear tags (default: False)
-        :return:
         """
         if append and type(tags) == list:
             current_list = self.get_host_tags(host_id=host_id).json()['tags']
@@ -371,48 +370,71 @@ class VectraClient(object):
     @validate_api_v2
     @request_error_handler
     def create_rule(self, detection_category=None, detection_type=None, triage_category=None, description=None,
-                    is_whitelist=False, ip=[], hosts=[], sensor_luid=[], **kwargs):
+                    is_whitelist=False, ip=[], host=[], sensor_luid=[], all_hosts=False, **kwargs):
+        """
+        Create triage rule
+        :param detection_category: detection category to triage [botnet activity, command & control, reconnaissance,
+        lateral movement, exfiltration]
+        :param detection_type: detection type to triage
+        :param triage_category: name that will be used for triaged detection
+        :param description: name of the triage rule
+        :param is_whitelist: set to True if rule is to whitelist; opposed to tracking detecitons without scores (boolean)
+        :param ip: list of ip addresses to apply to triage rule
+        :param host: list of host ids to apply to triage rule
+        :param sensor_luid: list of sensor luids to triage
+        :param all_hosts: apply triage rule to all hosts (boolean)
+        :param remote1_ip: destination ip addresses to triage
+        :param remote1_dns: destination hostnames to triage
+        :param remote1_port: destination ports to  triage
+        :returns request object
+        """
         if not all([detection_category, detection_type, triage_category, description]):
             raise ValueError("missing required value: "
-                             "detection_category, detection_type, triage_category, description, is_whitelist")
+                             "detection_category, detection_type, triage_category, description")
 
-        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement',
-                                              'exfiltration']:
+        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance',
+                                              'lateral movement', 'exfiltration']:
             raise ValueError("detection_category not recognized")
 
-        if not any([ip, hosts, sensor_luid]):
-            raise ValueError("one of the following required: ip, host_id, sensor_luid")
+        if not any([ip, host, sensor_luid, all_hosts]):
+            raise ValueError("one of the following required: ip, host, sensor_luid, all_hosts")
 
-        # Break out to if/else for each type
-        if not all([type(ip) == list, type(hosts) == list, type(sensor_luid) == list]):
-            raise TypeError("value must be type: list")
+        if ip and not type(ip) == list:
+            raise TypeError("ip must be type: list")
+        elif host and not type(host) == list:
+            raise TypeError("host must be type: list")
+        elif sensor_luid and not type(sensor_luid):
+            raise TypeError("sensor_luid must be type: list")
 
+        # TODO migrate detection to detection_type
+        # TODO change description to name
         body = {
+            "all_hosts": all_hosts,
             "detection_category": detection_category,
-            "detection_type": detection_type,
+            "detection": detection_type,
             "triage_category": triage_category,
             "description": description,
             "is_whitelist": is_whitelist,
         }
 
-        if hosts:
+        if host and not all_hosts:
             transformed_list = []
-            for host in hosts:
-                if host.startswith("http"):
-                    transformed_list.append(host)
+            for host_ref in host:
+                if host_ref.startswith("http"):
+                    transformed_list.append(host_ref)
                 else:
-                    transformed_list.append("{url}/hosts/{id}".format(url=self.url, id=host))
+                    transformed_list.append("{url}/hosts/{id}".format(url=self.url, id=host_ref))
             body['host'] = transformed_list
-        elif ip:
+        elif ip and not all_hosts:
             body['ip'] = ip
-        elif sensor_luid:
+        elif sensor_luid and not  all_hosts:
             body['sensor_luid'] = sensor_luid
 
         for k, v in kwargs.items():
             body[k] = v
 
-        # Insert POST method
-        print body
+        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=body,
+                             verify=False)
 
     @validate_api_v2
     @request_error_handler
@@ -428,6 +450,7 @@ class VectraClient(object):
         :returns: request object
         """
 
+        # TODO update category to detection_category
         payload = {
             "threatFeed": {
                 "name": name,
