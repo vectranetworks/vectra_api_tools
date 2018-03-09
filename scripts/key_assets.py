@@ -31,12 +31,14 @@ def main():
     args = vars(parser.parse_args())
     vc = vectra.VectraClient(url=args['url'], token=args['token'])
 
+    set_ka = True if not args['unset'] else False
+
     if args['file'] and args['type'] == 'hostname':
         hostfile = open(args['target'], 'r')
         for host in hostfile.readlines():
             try:
                 host_id = vc.get_hosts(name=host.strip()).json()['results'][0]['id']
-                resp = vc.set_key_asset(host_id=host_id, unset=args['unset'])
+                resp = vc.set_key_asset(host_id=host_id, set=set_ka)
                 respCode(args, resp, host.strip())
             except IndexError:
                 print host.strip() + " is not present in Vectra"
@@ -45,7 +47,7 @@ def main():
         for host in hostfile.readlines():
             try:
                 host_id = vc.get_hosts(last_source=host.strip()).json()['results'][0]['id']
-                resp = vc.set_key_asset(host_id=host_id, unset=args['unset'])
+                resp = vc.set_key_asset(host_id=host_id, set=set_ka)
                 respCode(args, resp, host.strip())
             except IndexError:
                 print host.strip() + " is not present in Vectra"
@@ -53,15 +55,15 @@ def main():
         if args['type'] == 'hostname':
             hosts = vc.get_hosts(name=args['target']).json()['results']
             for host in hosts:
-                resp = vc.set_key_asset(host_id=host['id'], unset=args['unset'])
+                resp = vc.set_key_asset(host_id=host['id'], set=set_ka)
                 respCode(args, resp, args['target'])
         if args['type'] == 'ip':
             hosts = vc.get_hosts(last_source=args['target']).json()['results']
             for host in hosts:
-                resp = vc.set_key_asset(host_id=host['id'], unset=args['unset'])
+                resp = vc.set_key_asset(host_id=host['id'], set=set_ka)
                 respCode(args, resp, args['target'])
         if args['type'] == 'id':
-            resp = vc.set_key_asset(host_id=args['target'], unset=args['unset'])
+            resp = vc.set_key_asset(host_id=args['target'], set=set_ka)
             respCode(args, resp, args['target'])
 
 
