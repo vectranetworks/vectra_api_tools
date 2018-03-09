@@ -370,6 +370,52 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
+    def create_rule(self, detection_category=None, detection_type=None, triage_category=None, description=None,
+                    is_whitelist=False, ip=[], hosts=[], sensor_luid=[], **kwargs):
+        if not all([detection_category, detection_type, triage_category, description]):
+            raise ValueError("missing required value: "
+                             "detection_category, detection_type, triage_category, description, is_whitelist")
+
+        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement',
+                                              'exfiltration']:
+            raise ValueError("detection_category not recognized")
+
+        if not any([ip, hosts, sensor_luid]):
+            raise ValueError("one of the following required: ip, host_id, sensor_luid")
+
+        # Break out to if/else for each type
+        if not all([type(ip) == list, type(hosts) == list, type(sensor_luid) == list]):
+            raise TypeError("value must be type: list")
+
+        body = {
+            "detection_category": detection_category,
+            "detection_type": detection_type,
+            "triage_category": triage_category,
+            "description": description,
+            "is_whitelist": is_whitelist,
+        }
+
+        if hosts:
+            transformed_list = []
+            for host in hosts:
+                if host.startswith("http"):
+                    transformed_list.append(host)
+                else:
+                    transformed_list.append("{url}/hosts/{id}".format(url=self.url, id=host))
+            body['host'] = transformed_list
+        elif ip:
+            body['ip'] = ip
+        elif sensor_luid:
+            body['sensor_luid'] = sensor_luid
+
+        for k, v in kwargs.items():
+            body[k] = v
+
+        # Insert POST method
+        print body
+
+    @validate_api_v2
+    @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
         Creates new threat feed
