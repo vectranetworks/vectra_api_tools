@@ -441,6 +441,39 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
+    def update_rule(self, rule_id=None, name=None, append=False, **kwargs):
+        """
+        Update triage rule
+        :param rule_id: id of rule to update
+        :param name: name of rule to update
+        :param append: set to True if appending to existing list (boolean)
+        :param ip: list of ip addresses to apply to triage rule
+        :param host: list of host ids to apply to triage rule
+        :param sensor_luid: list of sensor luids to triage
+        :param remote1_ip: destination ip addresses to triage
+        :param remote1_dns: destination hostnames to triage
+        :param remote1_port: destination ports to  triage
+        """
+        if not rule_id and not name:
+            raise ValueError("rule name or id must be provided")
+
+        id = self.get_rule_by_name(name=name)['id'] if name else rule_id
+        rule = self.get_rule_by_id(rule_id=id).json()['results'][0]
+
+        if append:
+            for k, v in kwargs.items():
+                if k in ['ip', 'host', 'sensor_luid'] and not type(k) == list:
+                    raise ValueError('{} must be of type: list'.format(k))
+                rule[k] += self._transform_hosts(v) if k == 'host' else v
+        else:
+            for k, v in kwargs.items():
+                rule[k] = v
+
+        return requests.put('{url}/rules/{id}'.format(url=self.url, id=id), headers=self.headers, json=rule,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
         Creates new threat feed
