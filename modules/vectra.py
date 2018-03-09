@@ -99,7 +99,7 @@ class VectraClient(object):
                       'detection_category', 'fields', 'host_id', 'is_targeting_key_asset', 'is_triaged', 'ordering',
                       'page', 'page_size', 'src_ip', 'state', 't_score', 't_score_gte', 'tags', 'targets_key_asset',
                       'threat', 'threat_gte']
-        deprecated_keys = ['c_score', 'c_score_gte', 'category', 't_score', 't_score_gte', 'targets_key_asset']
+        deprecated_keys = ['c_score', 'c_score_gte', 'category', 'detection', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
             if k in valid_keys and v is not None: params[k] = v
             if k in deprecated_keys: param_deprecation(k)
@@ -139,7 +139,7 @@ class VectraClient(object):
             return requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth, 
+            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
     def get_all_hosts(self, **kwargs):
@@ -202,7 +202,7 @@ class VectraClient(object):
     def get_host_tags(self, host_id=None):
         """
         Get host ags
-        :param host_id: 
+        :param host_id:
         """
         return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
                             verify=False)
@@ -212,11 +212,11 @@ class VectraClient(object):
     def set_host_tags(self, host_id=None, tags=[], append=False):
         """
         Set host tags
-        :param host_id: 
+        :param host_id:
         :param tags: list of tags to add to host
-        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear tags (default: False)
-        :return: 
+        :return:
         """
         if append and type(tags) == list:
             current_list = self.get_host_tags(host_id=host_id).json()['tags']
@@ -270,7 +270,7 @@ class VectraClient(object):
             return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth, 
+            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
     def get_all_detections(self, **kwargs):
@@ -318,9 +318,9 @@ class VectraClient(object):
     def set_detection_tags(self, detection_id=None, tags=[], append=False):
         """
         Set  detection tags
-        :param detection_id: 
+        :param detection_id:
         :param tags: list of tags to add to detection
-        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear all tags (default: False)
         """
         if append and type(tags) == list:
@@ -348,11 +348,25 @@ class VectraClient(object):
     @request_error_handler
     def get_rules(self):
         """
-        Get detection tags
-        :param detection_id:
+        Get triage rules
         """
         return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
                             verify=False)
+
+    @validate_api_v2
+    @request_error_handler
+    def get_rule_by_id(self, rule_id=None):
+        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
+
+    @validate_api_v2
+    def get_rule_by_name(self, name=None):
+        """
+        Get triage rule by name
+        :param name:
+        """
+        for rule in self.get_rules().json()['results']:
+            if rule['description'] == name:
+                return rule
 
     @validate_api_v2
     @request_error_handler
