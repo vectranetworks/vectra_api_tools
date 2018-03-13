@@ -405,13 +405,6 @@ class VectraClient(object):
         if not any([ip, host, sensor_luid, all_hosts]):
             raise KeyError("one of the following required: ip, host, sensor_luid, all_hosts")
 
-        if ip and not type(ip) == list:
-            raise TypeError("ip must be type: list")
-        elif host and not type(host) == list:
-            raise TypeError("host must be type: list")
-        elif sensor_luid and not type(sensor_luid):
-            raise TypeError("sensor_luid must be type: list")
-
         # TODO migrate detection to detection_type
         # TODO change description to name
         payload = {
@@ -424,13 +417,21 @@ class VectraClient(object):
         }
 
         if host and not all_hosts:
+            if type(host) and not type(host) == list:
+                raise TypeError("host must be type: list")
             payload['host'] = self._transform_hosts(host)
         elif ip and not all_hosts:
+            if ip and not type(ip) == list:
+                raise TypeError("ip must be type: list")
             payload['ip'] = ip
         elif sensor_luid and not  all_hosts:
+            if sensor_luid and not type(sensor_luid):
+                raise TypeError("sensor_luid must be type: list")
             payload['sensor_luid'] = sensor_luid
 
         for k, v in kwargs.items():
+            if not type(v) == list:
+                raise TypeError("{} must be of type: list".format(k))
             payload[k] = v
 
         return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
