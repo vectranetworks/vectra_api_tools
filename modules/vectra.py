@@ -458,7 +458,7 @@ class VectraClient(object):
             raise ValueError("rule name or id must be provided")
 
         id = self.get_rule_by_name(name=name)['id'] if name else rule_id
-        rule = self.get_rule_by_id(rule_id=id).json()['results'][0]
+        rule = self.get_rule_by_id(rule_id=id).json()
 
         if append:
             for k, v in kwargs.items():
