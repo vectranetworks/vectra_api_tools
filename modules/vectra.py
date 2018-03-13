@@ -114,6 +114,7 @@ class VectraClient(object):
                 transformed_list.append(host)
         return transformed_list
 
+    # TODO Consolidate get methods
     @request_error_handler
     def get_hosts(self, **kwargs):
         """
@@ -247,6 +248,7 @@ class VectraClient(object):
         return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=headers,
                               data=json.dumps(payload), verify=self.verify)
 
+    # TODO consolidate get methods
     @request_error_handler
     def get_detections(self, **kwargs):
         """
@@ -354,27 +356,22 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def get_rules(self):
+    def get_rules(self, name=None, rule_id=None):
         """
         Get triage rules
+        :param name: name of triage rule to retrieve
+        :param rule_id: id of triage rule to retrieve
         """
-        return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+        if rule_id:
+            return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
+        elif name:
+            for rule in requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+                            verify=False).json()['results']:
+                if rule['description'] == name:
+                    return rule
+        else:
+            return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
                             verify=False)
-
-    @validate_api_v2
-    @request_error_handler
-    def get_rule_by_id(self, rule_id=None):
-        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
-
-    @validate_api_v2
-    def get_rule_by_name(self, name=None):
-        """
-        Get triage rule by name
-        :param name:
-        """
-        for rule in self.get_rules().json()['results']:
-            if rule['description'] == name:
-                return rule
 
     @validate_api_v2
     @request_error_handler
