@@ -398,7 +398,7 @@ class VectraClient(object):
         :returns request object
         """
         if not all([detection_category, detection_type, triage_category, description]):
-            raise ValueError("missing required value: "
+            raise KeyError("missing required parameter: "
                              "detection_category, detection_type, triage_category, description")
 
         if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance',
@@ -406,7 +406,7 @@ class VectraClient(object):
             raise ValueError("detection_category not recognized")
 
         if not any([ip, host, sensor_luid, all_hosts]):
-            raise ValueError("one of the following required: ip, host, sensor_luid, all_hosts")
+            raise KeyError("one of the following required: ip, host, sensor_luid, all_hosts")
 
         if ip and not type(ip) == list:
             raise TypeError("ip must be type: list")
@@ -460,13 +460,17 @@ class VectraClient(object):
         id = self.get_rule_by_name(name=name)['id'] if name else rule_id
         rule = self.get_rule_by_id(rule_id=id).json()
 
-        if append:
-            for k, v in kwargs.items():
-                if k in ['ip', 'host', 'sensor_luid'] and not type(k) == list:
-                    raise ValueError('{} must be of type: list'.format(k))
+        valid_keys = ['ip', 'host', 'sensor_luid', 'remote1_ip', 'remote1_dns', 'remote1_port']
+
+        for k, v in kwargs.items():
+            if k not in valid_keys:
+                raise KeyError('invalid parameter provided. acceptable params: {}'.format(valid_keys))
+            if not type(v) == list:
+                raise TypeError('{} must be of type: list'.format(k))
+
+            if append:
                 rule[k] += self._transform_hosts(v) if k == 'host' else v
-        else:
-            for k, v in kwargs.items():
+            else:
                 rule[k] = v
 
         return requests.put('{url}/rules/{id}'.format(url=self.url, id=id), headers=self.headers, json=rule,
