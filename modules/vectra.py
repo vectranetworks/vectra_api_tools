@@ -455,8 +455,8 @@ class VectraClient(object):
         if not rule_id and not name:
             raise ValueError("rule name or id must be provided")
 
-        id = self.get_rule_by_name(name=name)['id'] if name else rule_id
-        rule = self.get_rule_by_id(rule_id=id).json()
+        id = self.get_rules(name=name)['id'] if name else rule_id
+        rule = self.get_rules(rule_id=id).json()
 
         valid_keys = ['ip', 'host', 'sensor_luid', 'remote1_ip', 'remote1_dns', 'remote1_port']
 
