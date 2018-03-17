@@ -9,6 +9,7 @@ from vat.cli import getPassword
 
 requests.packages.urllib3.disable_warnings()
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--url',
@@ -30,6 +31,7 @@ def main():
     else:
         vc = vectra.VectraClient(url=args['url'], token=args['token'])
 
+    total_count = 0
     subnets = {}
 
     for page in vc.get_all_hosts(fields='name,last_source'):
@@ -43,12 +45,14 @@ def main():
                 }
             subnets[network]['count'] += 1
             subnets[network]['hosts'].append(host['name'])
+            total_count += 1
 
     # TODO numeric sorting
     for key in sorted(subnets.iterkeys()):
-        print "{subnet:<18}: {count}".format(subnet=key, count=subnets[key]['count'])
+        print "{subnet:<18}> {count}".format(subnet=key, count=subnets[key]['count'])
         if args['list_hosts']:
             print subnets[key]['hosts']
+    print "\n\n{:<18}> {count}".format('total host count', count=total_count)
 
 
 if __name__ == '__main__':
