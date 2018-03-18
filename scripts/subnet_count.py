@@ -20,6 +20,8 @@ def main():
                        help='api token')
     group.add_argument('--user',
                        help='username for basic auth')
+    parser.add_argument('--csv',
+                        action='store_true')
     parser.add_argument('--list_hosts',
                         action='store_true')
 
@@ -49,9 +51,14 @@ def main():
 
     # TODO numeric sorting
     for key in sorted(subnets.iterkeys()):
-        print "{subnet:<18}> {count}".format(subnet=key, count=subnets[key]['count'])
+        if args['csv']:
+            print "{key},{count}".format(key=key, count=subnets[key]['count'])
+        else:
+            print "{subnet:<18}> {count}".format(subnet=key, count=subnets[key]['count'])
+
         if args['list_hosts']:
-            print subnets[key]['hosts']
+            print ",".join(subnets[key]['hosts'])
+
     print "\n\n{:<18}> {count}".format('total host count', count=total_count)
 
 
