@@ -346,6 +346,11 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
+    def get_proxies(self):
+        return requests.get('{url}/proxies'.format(url=self.url, headers=self.headers, verify=self.verify))
+
+    @validate_api_v2
+    @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
         Creates new threat feed
