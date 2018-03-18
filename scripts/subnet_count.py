@@ -1,6 +1,7 @@
 #! /usr/bin/evn python
 
 import argparse
+import pprint
 import requests
 import re
 import vat.vectra as vectra
@@ -50,16 +51,19 @@ def main():
             total_count += 1
 
     # TODO numeric sorting
-    for key in sorted(subnets.iterkeys()):
-        if args['csv']:
-            print "{key},{count}".format(key=key, count=subnets[key]['count'])
-        else:
-            print "{subnet:<18}> {count}".format(subnet=key, count=subnets[key]['count'])
+    if args['csv']:
+        for key in sorted(subnets.iterkeys()):
+            print "{key},{count},".format(key=key, count=subnets[key]['count']),
+            if args['list_hosts']:
+                print " ".join(subnets[key]['hosts'])
+            else:
+                print
+    else:
+        pprint.pprint(subnets, width=40)
 
-        if args['list_hosts']:
-            print ",".join(subnets[key]['hosts'])
 
-    print "\n\n{:<18}> {count}".format('total host count', count=total_count)
+
+    print "\n\n{:<18} {count}".format('total host count:', count=total_count)
 
 
 if __name__ == '__main__':
