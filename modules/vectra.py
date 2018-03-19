@@ -355,7 +355,6 @@ class VectraClient(object):
                               data=json.dumps(payload), verify=self.verify)
 
     @validate_api_v2
-    @request_error_handler
     def get_rules(self, name=None, rule_id=None):
         """
         Get triage rules
