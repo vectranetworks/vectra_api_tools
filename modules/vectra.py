@@ -355,7 +355,7 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def add_proxy(self, host=None, enable=True):
+    def add_proxy(self, address=None, enable=True):
         headers = self.headers
         headers.update({
             "Content-Type": "application/json"
@@ -363,7 +363,7 @@ class VectraClient(object):
 
         payload = {
             "proxy": {
-                "address": host,
+                "address": address,
                 "considerProxy": enable
             }
         }
