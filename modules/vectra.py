@@ -390,6 +390,11 @@ class VectraClient(object):
                               verify=self.verify)
 
     @validate_api_v2
+    def delete_proxy(self,proxy_id=None):
+        return requests.delete('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
+                              verify=self.verify)
+
+    @validate_api_v2
     @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
