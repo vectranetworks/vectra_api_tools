@@ -187,7 +187,7 @@ class VectraClient(object):
     def set_key_asset(self, host_id=None, set=True):
         """
         (Un)set host as key asset
-        :param id: id of host needing to be set - required
+        :param host_id: id of host needing to be set - required
         :param set: set flag to true if setting host as key asset
         """
 
@@ -434,7 +434,7 @@ class VectraClient(object):
             payload[k] = v
 
         return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
-                             verify=False)
+                             verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -471,7 +471,25 @@ class VectraClient(object):
                 rule[k] = v
 
         return requests.put('{url}/rules/{id}'.format(url=self.url, id=id), headers=self.headers, json=rule,
-                            verify=False)
+                            verify=self.verify)
+
+    @validate_api_v2
+    def delete_rule(self, rule_id=None, restore_detections=True):
+        """
+        Delete triage rule
+        :param rule_id:
+        :param restore_detections: restore previously triaged detections (bool) default behavior is to restore
+        detections
+        """
+        if not all([rule_id, restore_detections]):
+            raise ValueError('rule_id and restore_detections are required parameters')
+
+        params = {
+            'restore_detections': restore_detections
+        }
+
+        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=id), headers=self.headers, params=params,
+                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
