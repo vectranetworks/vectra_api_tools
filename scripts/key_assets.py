@@ -87,7 +87,7 @@ def respCode(args, resp, hostname):
     if resp.status_code == 200 and args['unset']:
         print "Successfully unset host " + str(hostname) + " as key asset"
     elif resp.status_code == 200 and not args['unset']:
-        print "Succefully set host " + str(hostname) + " as key asset"
+        print "Successfully set host " + str(hostname) + " as key asset"
     else:
         print "Unknown response"
 
