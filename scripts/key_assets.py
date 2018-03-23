@@ -43,7 +43,7 @@ def main():
             except IndexError:
                 print host.strip() + " is not present in Vectra"
     elif args['file'] and args['type'] == 'ip':
-        hostfile = open(args['last_source'], 'r')
+        hostfile = open(args['target'], 'r')
         for host in hostfile.readlines():
             try:
                 host_id = vc.get_hosts(last_source=host.strip()).json()['results'][0]['id']
