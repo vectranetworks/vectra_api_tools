@@ -6,7 +6,7 @@ requests.packages.urllib3.disable_warnings()
 test_vars = {}
 
 if not pytest.config.getoption('--token'):
-    pytest.skip('v1 client not configured', allow_module_level=True)
+    pytest.skip('v2 client not configured', allow_module_level=True)
 
 
 @pytest.fixture()
@@ -18,8 +18,8 @@ def test_host(vc_v2):
 def test_host2(vc_v2):
     return vc_v2.get_hosts().json()['results'][-2]
 
-
 # TODO Group tests into classes; host, ip, sensor_luid, all_hosts
+
 
 def test_create_rule_host(vc_v2, test_host):
     resp = vc_v2.create_rule(detection_category='botnet activity', detection_type='cryptocurrency mining',
@@ -51,10 +51,11 @@ def test_create_rule_all_hosts(vc_v2):
 
 
 def test_get_rules(vc_v2):
-    # get all rules
-    # get rule by id
-    # get rule by name
-    pass
+    resp = vc_v2.get_rules().json()
+    assert resp['count'] >= 3
+
+    resp2 = vc_v2.get_rules(name='pytest_hostname')
+    assert resp2['description'] == 'pytest_hostname'
 
 
 def test_update_rule_replace(vc_v2, test_host2):
@@ -84,6 +85,8 @@ def test_update_rule_append(vc_v2, test_host):
 
 
 def test_delete_rule(vc_v2):
-    # delete with keep
-    # delete with restore
-    pass
+    resp1 = vc_v2.delete_rule(rule_id=test_vars['host_rule_id']).json()
+    resp2 = vc_v2.delete_rule(rule_id=test_vars['host_rule_ip']).json()
+    resp3 = vc_v2.delete_rule(rule_id=test_vars['host_rule_all_hosts']).json()
+
+    assert all(resp['_meta']['level'] == 'success' for resp in [resp1, resp2, resp3])

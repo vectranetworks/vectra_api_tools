@@ -481,14 +481,11 @@ class VectraClient(object):
         :param restore_detections: restore previously triaged detections (bool) default behavior is to restore
         detections
         """
-        if not all([rule_id, restore_detections]):
-            raise ValueError('rule_id and restore_detections are required parameters')
-
         params = {
             'restore_detections': restore_detections
         }
 
-        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=id), headers=self.headers, params=params,
+        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
                                verify=self.verify)
 
     @validate_api_v2
