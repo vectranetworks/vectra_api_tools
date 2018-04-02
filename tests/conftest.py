@@ -24,5 +24,5 @@ def vc_v2(request):
     return vectra.VectraClient(url=brain, token=token)
 
 
-def pytest_namespace():
-    return {'threatFeed': None}
+# def pytest_namespace():
+#     return {'threatFeed': None}
