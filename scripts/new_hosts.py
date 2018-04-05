@@ -18,9 +18,9 @@ parser.add_argument('-d', '--debug', action='store_true', help='enable debugging
 args = parser.parse_args()
 
 if args.debug:
-    logging.basicConfig(level=logging.INFO)
-else:
     logging.basicConfig(level=logging.DEBUG)
+else:
+    logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 params = {
@@ -76,8 +76,8 @@ def main():
         [insert_host(upd, host) for host in hosts if not ht.search(Host.id == host['id'])]
         ht.insert_multiple(upd.all())
         logger.info('hosts added: {num}'.format(num=len(upd)))
-        [logger.debug('id: {id}, host: {name}, ip: {ip} added'.format(id=host['id'], name=host['name'], ip=host['ip']))
-                    for host in hosts]
+        [logger.debug('id: {id}, host: {name}, ip: {ip} added'.format(id=host['id'], name=host['name'],
+            ip=host['last_source'])) for host in hosts]
 
         if len(upd) > 0:
             send_message(upd)
@@ -87,8 +87,8 @@ def main():
         logger.info('creating hosts table')
         [insert_host(ht, host) for host in hosts]
         logger.info('hosts added: {num}'.format(num=len(ht)))
-        [logger.debug('id: {id}, host: {name}, ip: {ip} added'.format(id=host['id'], name=host['name'], ip=host['ip']))
-                    for host in hosts]
+        [logger.debug('id: {id}, host: {name}, ip: {ip} added'.format(id=host['id'], name=host['name'],
+            ip=host['last_source'])) for host in hosts]
 
 
 if __name__ == '__main__':
