@@ -3,6 +3,7 @@ import requests
 
 requests.packages.urllib3.disable_warnings()
 
+test_vars = {}
 
 if not pytest.config.getoption('--token'):
     pytest.skip('v1 client not configured', allow_module_level=True)
@@ -10,7 +11,7 @@ if not pytest.config.getoption('--token'):
 
 def test_create_feed(vc_v2):
     resp = vc_v2.create_feed(name='pytest', category='cnc', certainty='Medium', itype='Watchlist', duration=14)
-    pytest.threatFeed = resp.json()['threatFeed']['id']
+    test_vars['threatFeed'] = resp.json()['threatFeed']['id']
     assert resp.status_code == 201
 
 
@@ -27,12 +28,12 @@ def test_get_feed_by_name(vc_v2):
 
 
 def test_post_stix_file(vc_v2):
-    resp = vc_v2.post_stix_file(feed_id=pytest.threatFeed, stix_file='stix.xml')
+    resp = vc_v2.post_stix_file(feed_id=test_vars['threatFeed'], stix_file='stix.xml')
     assert resp.status_code == 200
 
 
 def test_delete_feed(vc_v2):
-    resp = vc_v2.delete_feed(feed_id=pytest.threatFeed)
+    resp = vc_v2.delete_feed(feed_id=test_vars['threatFeed'])
     assert resp.status_code == 200
 
 

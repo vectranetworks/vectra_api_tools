@@ -99,12 +99,22 @@ class VectraClient(object):
                       'detection_category', 'fields', 'host_id', 'is_targeting_key_asset', 'is_triaged', 'ordering',
                       'page', 'page_size', 'src_ip', 'state', 't_score', 't_score_gte', 'tags', 'targets_key_asset',
                       'threat', 'threat_gte']
-        deprecated_keys = ['c_score', 'c_score_gte', 'category', 't_score', 't_score_gte', 'targets_key_asset']
+        deprecated_keys = ['c_score', 'c_score_gte', 'category', 'detection', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
             if k in valid_keys and v is not None: params[k] = v
             if k in deprecated_keys: param_deprecation(k)
         return params
 
+    def _transform_hosts(self, host_list):
+        transformed_list = []
+        for host in host_list:
+            if isinstance(host, int) or not host.startswith("http"):
+                transformed_list.append("{url}/hosts/{id}".format(url=self.url, id=host))
+            else:
+                transformed_list.append(host)
+        return transformed_list
+
+    # TODO Consolidate get methods
     @request_error_handler
     def get_hosts(self, **kwargs):
         """
@@ -139,7 +149,7 @@ class VectraClient(object):
             return requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth, 
+            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
     def get_all_hosts(self, **kwargs):
@@ -177,7 +187,7 @@ class VectraClient(object):
     def set_key_asset(self, host_id=None, set=True):
         """
         (Un)set host as key asset
-        :param id: id of host needing to be set - required
+        :param host_id: id of host needing to be set - required
         :param set: set flag to true if setting host as key asset
         """
 
@@ -202,7 +212,7 @@ class VectraClient(object):
     def get_host_tags(self, host_id=None):
         """
         Get host ags
-        :param host_id: 
+        :param host_id:
         """
         return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
                             verify=False)
@@ -212,11 +222,10 @@ class VectraClient(object):
     def set_host_tags(self, host_id=None, tags=[], append=False):
         """
         Set host tags
-        :param host_id: 
+        :param host_id:
         :param tags: list of tags to add to host
-        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear tags (default: False)
-        :return: 
         """
         if append and type(tags) == list:
             current_list = self.get_host_tags(host_id=host_id).json()['tags']
@@ -239,6 +248,7 @@ class VectraClient(object):
         return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=headers,
                               data=json.dumps(payload), verify=self.verify)
 
+    # TODO consolidate get methods
     @request_error_handler
     def get_detections(self, **kwargs):
         """
@@ -270,7 +280,7 @@ class VectraClient(object):
             return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth, 
+            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
     def get_all_detections(self, **kwargs):
@@ -318,9 +328,9 @@ class VectraClient(object):
     def set_detection_tags(self, detection_id=None, tags=[], append=False):
         """
         Set  detection tags
-        :param detection_id: 
+        :param detection_id:
         :param tags: list of tags to add to detection
-        :param append: overwrites existing list if set to False, appends to existing tags if set to True 
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear all tags (default: False)
         """
         if append and type(tags) == list:
@@ -345,6 +355,140 @@ class VectraClient(object):
                               data=json.dumps(payload), verify=self.verify)
 
     @validate_api_v2
+    def get_rules(self, name=None, rule_id=None):
+        """
+        Get triage rules
+        :param name: name of triage rule to retrieve
+        :param rule_id: id of triage rule to retrieve
+        """
+        if rule_id:
+            return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
+        elif name:
+            for rule in requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+                            verify=False).json()['results']:
+                if rule['description'] == name:
+                    return rule
+        else:
+            return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+                            verify=False)
+
+    @validate_api_v2
+    @request_error_handler
+    def create_rule(self, detection_category=None, detection_type=None, triage_category=None, description=None,
+                    is_whitelist=False, ip=[], host=[], sensor_luid=[], all_hosts=False, **kwargs):
+        """
+        Create triage rule
+        :param detection_category: detection category to triage [botnet activity, command & control, reconnaissance,
+        lateral movement, exfiltration]
+        :param detection_type: detection type to triage
+        :param triage_category: name that will be used for triaged detection
+        :param description: name of the triage rule
+        :param is_whitelist: set to True if rule is to whitelist; opposed to tracking detecitons without scores (boolean)
+        :param ip: list of ip addresses to apply to triage rule
+        :param host: list of host ids to apply to triage rule
+        :param sensor_luid: list of sensor luids to triage
+        :param all_hosts: apply triage rule to all hosts (boolean)
+        :param remote1_ip: destination ip addresses to triage
+        :param remote1_dns: destination hostnames to triage
+        :param remote1_port: destination ports to  triage
+        :returns request object
+        """
+        if not all([detection_category, detection_type, triage_category, description]):
+            raise KeyError("missing required parameter: "
+                             "detection_category, detection_type, triage_category, description")
+
+        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance',
+                                              'lateral movement', 'exfiltration']:
+            raise ValueError("detection_category not recognized")
+
+        if not any([ip, host, sensor_luid, all_hosts]):
+            raise KeyError("one of the following required: ip, host, sensor_luid, all_hosts")
+
+        # TODO migrate detection to detection_type
+        # TODO change description to name
+        payload = {
+            "all_hosts": all_hosts,
+            "detection_category": detection_category,
+            "detection": detection_type,
+            "triage_category": triage_category,
+            "description": description,
+            "is_whitelist": is_whitelist,
+        }
+
+        if host and not all_hosts:
+            if type(host) and not type(host) == list:
+                raise TypeError("host must be type: list")
+            payload['host'] = self._transform_hosts(host)
+        elif ip and not all_hosts:
+            if ip and not type(ip) == list:
+                raise TypeError("ip must be type: list")
+            payload['ip'] = ip
+        elif sensor_luid and not  all_hosts:
+            if sensor_luid and not type(sensor_luid):
+                raise TypeError("sensor_luid must be type: list")
+            payload['sensor_luid'] = sensor_luid
+
+        for k, v in kwargs.items():
+            if not type(v) == list:
+                raise TypeError("{} must be of type: list".format(k))
+            payload[k] = v
+
+        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+                             verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_rule(self, rule_id=None, name=None, append=False, **kwargs):
+        """
+        Update triage rule
+        :param rule_id: id of rule to update
+        :param name: name of rule to update
+        :param append: set to True if appending to existing list (boolean)
+        :param ip: list of ip addresses to apply to triage rule
+        :param host: list of host ids to apply to triage rule
+        :param sensor_luid: list of sensor luids to triage
+        :param remote1_ip: destination ip addresses to triage
+        :param remote1_dns: destination hostnames to triage
+        :param remote1_port: destination ports to  triage
+        """
+        if not rule_id and not name:
+            raise ValueError("rule name or id must be provided")
+
+        id = self.get_rules(name=name)['id'] if name else rule_id
+        rule = self.get_rules(rule_id=id).json()
+
+        valid_keys = ['ip', 'host', 'sensor_luid', 'remote1_ip', 'remote1_dns', 'remote1_port']
+
+        for k, v in kwargs.items():
+            if k not in valid_keys:
+                raise KeyError('invalid parameter provided. acceptable params: {}'.format(valid_keys))
+            if not type(v) == list:
+                raise TypeError('{} must be of type: list'.format(k))
+
+            if append:
+                rule[k] += self._transform_hosts(v) if k == 'host' else v
+            else:
+                rule[k] = v
+
+        return requests.put('{url}/rules/{id}'.format(url=self.url, id=id), headers=self.headers, json=rule,
+                            verify=self.verify)
+
+    @validate_api_v2
+    def delete_rule(self, rule_id=None, restore_detections=True):
+        """
+        Delete triage rule
+        :param rule_id:
+        :param restore_detections: restore previously triaged detections (bool) default behavior is to restore
+        detections
+        """
+        params = {
+            'restore_detections': restore_detections
+        }
+
+        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
+                               verify=self.verify)
+
+    @validate_api_v2
     @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
@@ -358,6 +502,7 @@ class VectraClient(object):
         :returns: request object
         """
 
+        # TODO update category to detection_category
         payload = {
             "threatFeed": {
                 "name": name,
