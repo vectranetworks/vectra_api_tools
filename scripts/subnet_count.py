@@ -21,9 +21,9 @@ def main():
                        help='api token')
     group.add_argument('--user',
                        help='username for basic auth')
-    parser.add_argument('--csv',
+    parser.add_argument('--csv', help='output to csv',
                         action='store_true')
-    parser.add_argument('--list_hosts',
+    parser.add_argument('--list_hosts', help='add host list to csv',
                         action='store_true')
 
     args = vars(parser.parse_args())
