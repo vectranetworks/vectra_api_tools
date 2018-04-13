@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='vectra-api-tools',
-    version='1.0rc4a',
+    version='1.0rc5',
     author='Vectra',
     author_email='cjohnson@vectra.ai',
     url='https://github.com/vectranetworks/vectra_api_tools',
