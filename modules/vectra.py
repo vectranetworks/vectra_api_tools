@@ -571,6 +571,20 @@ class VectraClient(object):
         return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
                              files={'file': open(stix_file)}, verify=self.verify)
 
+    @validate_api_v2
+    @request_error_handler
+    def advanced_search(self, stype=None, query=None):
+        """
+        Advanced search
+        :param stype: search type (hosts, detections)
+        :param query: https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide
+        :return:
+        """
+        if stype not in ["hosts", "detections"]:
+            raise ValueError("Supported values for stype are hosts or detections")
+        return requests.get('{url}/search/{stype}/?query_string={query}'.format(url=self.url, stype=stype, query=query),
+                            headers=self.headers, verify=self.verify)
+
     @request_error_handler
     def custom_endpoint(self, path=None, **kwargs):
         if not str(path).startswith('/'):
