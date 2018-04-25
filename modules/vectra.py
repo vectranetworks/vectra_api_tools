@@ -573,16 +573,18 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def advanced_search(self, stype=None, query=None):
+    def advanced_search(self, stype=None, page_size=50, query=None):
         """
         Advanced search
         :param stype: search type (hosts, detections)
+        :param page_size: number of objects returned per page
         :param query: https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide
         :return:
         """
         if stype not in ["hosts", "detections"]:
             raise ValueError("Supported values for stype are hosts or detections")
-        return requests.get('{url}/search/{stype}/?query_string={query}'.format(url=self.url, stype=stype, query=query),
+        return requests.get('{url}/search/{stype}/?page_size={ps}&query_string={query}'.format(url=self.url, stype=stype,
+                                                ps=page_size, query=query),
                             headers=self.headers, verify=self.verify)
 
     @request_error_handler
