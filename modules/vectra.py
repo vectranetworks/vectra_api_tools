@@ -577,7 +577,7 @@ class VectraClient(object):
         """
         Advanced search
         :param stype: search type (hosts, detections)
-        :param page_size: number of objects returned per page
+        :param page_size: number of objects returned per page (default: 50, max: 5000)
         :param query: https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide
         :return:
         """
