@@ -194,7 +194,7 @@ class VectraClient(object):
         if not host_id:
             raise ValueError('Host id required')
 
-        headers = self.headers
+        headers = self.headers.copy()
         headers.update({
             'Content-Type': 'application/x-www-form-urlencoded'
         })
@@ -239,7 +239,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        headers = self.headers
+        headers = self.headers.copy()
         headers.update({
             'Content-Type': "application/json",
             'Cache-Control': "no-cache"
@@ -345,7 +345,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        headers = self.headers
+        headers = self.headers.copy()
         headers.update({
             'Content-Type': "application/json",
             'Cache-Control': "no-cache"
@@ -515,7 +515,7 @@ class VectraClient(object):
             }
         }
 
-        headers = self.headers
+        headers = self.headers.copy()
         headers.update({
             'Content-Type': "application/json",
             'Cache-Control': "no-cache"
