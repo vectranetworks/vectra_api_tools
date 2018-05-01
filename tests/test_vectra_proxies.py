@@ -37,7 +37,6 @@ def test_proxy_address_update(vc_v2):
 
 
 def test_proxy_state_update(vc_v2):
-    # Pending bug fix in 4.0
     resp = vc_v2.update_proxy(proxy_id=global_proxy['id'], enable=False)
     proxy = resp.json()['proxy']
 
