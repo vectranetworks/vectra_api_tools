@@ -490,6 +490,56 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
+    def get_proxies(self, proxy_id=None):
+        if proxy_id:
+            return requests.get('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
+                                verify=self.verify)
+        else:
+            return requests.get('{url}/proxies'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def add_proxy(self, address=None, enable=True):
+        headers = self.headers
+        headers.update({
+            "Content-Type": "application/json"
+        })
+
+        payload = {
+            "proxy": {
+                "address": address,
+                "considerProxy": enable
+            }
+        }
+
+        return requests.post('{url}/proxies'.format(url=self.url), json=payload, headers=headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_proxy(self, proxy_id=None, address=None, enable=True):
+        headers = self.headers
+        headers.update({
+            "Content-Type": "application/json"
+        })
+
+        proxy = self.get_proxies(proxy_id=proxy_id).json()['proxies']
+        payload = {
+            "proxy": {
+                "address": address if address else proxy['ip'],
+                "considerProxy": enable
+            }
+        }
+
+        return requests.patch('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), json=payload, headers=headers,
+                              verify=self.verify)
+
+    @validate_api_v2
+    def delete_proxy(self,proxy_id=None):
+        return requests.delete('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
+                              verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
         Creates new threat feed
