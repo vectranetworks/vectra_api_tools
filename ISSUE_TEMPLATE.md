@@ -2,6 +2,7 @@
 Operating system:  
 Python version:  
 VAT version:  
+Vectra version:  
 
 ### Exptected behavior
 
