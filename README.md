@@ -7,13 +7,21 @@ The current repository is broken down into the following:
 * _test_ - collection of tests that can be used to validate the VAT library
 * _Vectra\_APIv1.postman\_collection_ is a Postman collection for the Vectra API. It has all of the current endpoints and and associated parameters for each endpoint
 
-**Wiki**
+**Wiki**  
 https://github.com/vectranetworks/vectra_api_tools/wiki
 
-**Current version**
+**Current version**  
 1.0rc6
 
-
-**License**
+**License**  
 Apache 2
 
+**Installation**  
+pip:  
+```
+pip install vectra_api_tools
+```
+source:  
+```
+python setup.py install
+```
