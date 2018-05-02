@@ -628,8 +628,8 @@ class VectraClient(object):
         Advanced search
         :param stype: search type (hosts, detections)
         :param page_size: number of objects returned per page (default: 50, max: 5000)
-        :param query: https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide
-        :return:
+        :param advanced query (download the following guide for more details on query language
+            https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide)
         """
         if stype not in ["hosts", "detections"]:
             raise ValueError("Supported values for stype are hosts or detections")
