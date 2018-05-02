@@ -77,7 +77,6 @@ def test_update_rule_append(vc_v2, test_host):
     assert resp.status_code == 200
 
     resp2 = vc_v2.get_rules(rule_id=test_vars['host_rule_ip']).json()
-    print resp2
     assert all(ip in resp2['ip'] for ip in [test_host['last_source'], '254.254.254.254'])
     assert all(domain in resp2['remote1_dns'] for domain in ['google.com', 'foo.com'])
     assert all(ip in resp2['remote1_ip'] for ip in ['8.8.8.8', '4.4.4.4'])

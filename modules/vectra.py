@@ -490,6 +490,56 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
+    def get_proxies(self, proxy_id=None):
+        if proxy_id:
+            return requests.get('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
+                                verify=self.verify)
+        else:
+            return requests.get('{url}/proxies'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def add_proxy(self, address=None, enable=True):
+        headers = self.headers
+        headers.update({
+            "Content-Type": "application/json"
+        })
+
+        payload = {
+            "proxy": {
+                "address": address,
+                "considerProxy": enable
+            }
+        }
+
+        return requests.post('{url}/proxies'.format(url=self.url), json=payload, headers=headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_proxy(self, proxy_id=None, address=None, enable=True):
+        headers = self.headers
+        headers.update({
+            "Content-Type": "application/json"
+        })
+
+        proxy = self.get_proxies(proxy_id=proxy_id).json()['proxies']
+        payload = {
+            "proxy": {
+                "address": address if address else proxy['ip'],
+                "considerProxy": enable
+            }
+        }
+
+        return requests.patch('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), json=payload, headers=headers,
+                              verify=self.verify)
+
+    @validate_api_v2
+    def delete_proxy(self,proxy_id=None):
+        return requests.delete('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
+                              verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
     def create_feed(self, name=None, category=None, certainty=None, itype=None, duration=None):
         """
         Creates new threat feed
@@ -570,6 +620,22 @@ class VectraClient(object):
         """
         return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
                              files={'file': open(stix_file)}, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def advanced_search(self, stype=None, page_size=50, query=None):
+        """
+        Advanced search
+        :param stype: search type (hosts, detections)
+        :param page_size: number of objects returned per page (default: 50, max: 5000)
+        :param advanced query (download the following guide for more details on query language
+            https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide)
+        """
+        if stype not in ["hosts", "detections"]:
+            raise ValueError("Supported values for stype are hosts or detections")
+        return requests.get('{url}/search/{stype}/?page_size={ps}&query_string={query}'.format(url=self.url, stype=stype,
+                                                ps=page_size, query=query),
+                            headers=self.headers, verify=self.verify)
 
     @request_error_handler
     def custom_endpoint(self, path=None, **kwargs):
