@@ -1,4 +1,4 @@
-#! /usr/bin/evn python
+#! /usr/bin/env python
 
 import argparse
 import pprint
@@ -39,6 +39,8 @@ def main():
 
     for page in vc.get_all_hosts(fields='name,last_source'):
         for host in page.json()['results']:
+            if not host['last_source']:
+                continue
             octet = re.search('(?P<subnet>(\d+\.){3})\d+', host['last_source'])
             network = "{subnet}0".format(subnet=octet.group('subnet'))
             if not subnets.get(network):
