@@ -25,8 +25,11 @@ def main():
                         action='store_true')
     parser.add_argument('--list_hosts', help='add host list to csv',
                         action='store_true')
+    parser.add_argument('--all-hosts', action='store_true',
+                        help='return active and inactive hosts (only active hosts by default)')
 
     args = vars(parser.parse_args())
+    print args
 
     if args['user']:
         args['password'] = getPassword()
@@ -37,7 +40,7 @@ def main():
     total_count = 0
     subnets = {}
 
-    for page in vc.get_all_hosts(fields='name,last_source'):
+    for page in vc.get_all_hosts(all=args['all_hosts'], fields='name,last_source'):
         for host in page.json()['results']:
             if not host['last_source']:
                 continue
