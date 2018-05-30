@@ -77,7 +77,7 @@ class VectraClient(object):
         :rtype: dict
         """
         params = {}
-        valid_keys = ['active_traffic', 'c_score', 'c_score_gte', 'certainty', 'certainty_gte', 'fields',
+        valid_keys = ['all', 'active_traffic', 'c_score', 'c_score_gte', 'certainty', 'certainty_gte', 'fields',
                       'has_active_traffic', 'include_detection_summaries', 'is_key_asset', 'is_targeting_key_asset',
                       'key_asset', 'last_source', 'mac_address', 'name', 'ordering', 'page', 'page_size', 'state',
                       't_score', 't_score_gte', 'tags', 'threat', 'threat_gte', 'targets_key_asset']
