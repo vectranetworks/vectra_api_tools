@@ -23,7 +23,6 @@ def test_proxy_add(vc_v2):
     assert resp.status_code == 200
     assert proxy['ip'] == '192.168.254.254'
     assert proxy['considerProxy'] == True
-    assert proxy['source'] == 'user'
 
 
 def test_proxy_address_update(vc_v2):
@@ -33,7 +32,6 @@ def test_proxy_address_update(vc_v2):
     assert resp.status_code == 200
     assert proxy['ip'] == '192.168.254.253'
     assert proxy['considerProxy'] == True
-    assert proxy['source'] == 'user'
 
 
 def test_proxy_state_update(vc_v2):
@@ -43,4 +41,3 @@ def test_proxy_state_update(vc_v2):
     assert resp.status_code == 200
     assert proxy['ip'] == '192.168.254.253'
     assert proxy['considerProxy'] == False
-    assert proxy['source'] == 'user'

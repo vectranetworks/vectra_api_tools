@@ -523,12 +523,11 @@ class VectraClient(object):
         })
 
         proxy = self.get_proxies(proxy_id=proxy_id).json()['proxies']
-        payload = {
-            "proxy": {
-                "address": address if address else proxy['ip'],
-                "considerProxy": enable
-            }
-        }
+        payload = {"proxy": {}}
+        if address is not None:
+            payload["proxy"]["address"] = address 
+        if enable is not None:
+            payload["proxy"]["considerProxy"] = enable
 
         return requests.patch('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), json=payload, headers=headers,
                               verify=self.verify)
