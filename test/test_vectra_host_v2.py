@@ -15,6 +15,13 @@ def test_get_hosts(vc_v2):
     assert resp.status_code == 200
 
 
+def test_get_hosts_note_modified(vc_v2):
+    resp = vc_v2.get_hosts(note_modified_timestamp_gte=100)
+
+    assert vc_v2.version == 2
+    assert resp.status_code == 200
+
+
 def test_host_generator(vc_v2):
     host_gen = vc_v2.get_all_hosts(page_size=1)
     results = next(host_gen)

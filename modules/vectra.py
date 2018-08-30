@@ -80,7 +80,7 @@ class VectraClient(object):
         valid_keys = ['all', 'active_traffic', 'c_score', 'c_score_gte', 'certainty', 'certainty_gte', 'fields',
                       'has_active_traffic', 'include_detection_summaries', 'is_key_asset', 'is_targeting_key_asset',
                       'key_asset', 'last_source', 'mac_address', 'name', 'ordering', 'page', 'page_size', 'state',
-                      't_score', 't_score_gte', 'tags', 'threat', 'threat_gte', 'targets_key_asset']
+                      't_score', 't_score_gte', 'tags', 'threat', 'threat_gte', 'targets_key_asset', 'note_modified_timestamp_gte']
         deprecated_keys = ['c_score', 'c_score_gte', 'key_asset', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
             if k in valid_keys and v is not None: params[k] = v
@@ -98,7 +98,7 @@ class VectraClient(object):
         valid_keys = ['c_score', 'c_score_gte', 'category', 'certainty', 'certainty_gte', 'detection', 'detection_type',
                       'detection_category', 'fields', 'host_id', 'is_targeting_key_asset', 'is_triaged', 'ordering',
                       'page', 'page_size', 'src_ip', 'state', 't_score', 't_score_gte', 'tags', 'targets_key_asset',
-                      'threat', 'threat_gte']
+                      'threat', 'threat_gte', 'note_modified_timestamp_gte']
         deprecated_keys = ['c_score', 'c_score_gte', 'category', 'detection', 't_score', 't_score_gte', 'targets_key_asset']
         for k, v in args.items():
             if k in valid_keys and v is not None: params[k] = v
@@ -143,6 +143,7 @@ class VectraClient(object):
         :param targets_key_asset: host is targeting key asset (bool)
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
+        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (int)
         """
 
         if self.version == 2:
@@ -274,6 +275,7 @@ class VectraClient(object):
         :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
         :param threat: threat score (int)
         :param threat_gte threat score is greater than or equal to (int)
+        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (int)
         """
 
         if self.version == 2:
@@ -525,7 +527,7 @@ class VectraClient(object):
         proxy = self.get_proxies(proxy_id=proxy_id).json()['proxies']
         payload = {"proxy": {}}
         if address is not None:
-            payload["proxy"]["address"] = address 
+            payload["proxy"]["address"] = address
         if enable is not None:
             payload["proxy"]["considerProxy"] = enable
 
