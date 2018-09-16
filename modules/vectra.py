@@ -295,7 +295,7 @@ class VectraClient(object):
         while resp.json()['next']:
             url = resp.json()['next']
             path = url.replace(self.url, '')
-            resp = self.custom_endpoint(path=path).json()
+            resp = self.custom_endpoint(path=path)
             yield resp
 
     @request_error_handler
