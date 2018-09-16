@@ -43,3 +43,11 @@ def test_detection_tags(vc_v2):
 
     vc_v2.set_detection_tags(detection_id=detection_id, tags=detection_tags)
     assert vc_v2.get_detection_tags(detection_id=detection_id).json()['tags'] == detection_tags
+
+
+def test_get_detections_note_modified_apiv2(vc_v2):
+    resp = vc_v2.get_detections(note_modified_timestamp_gte=1000)
+
+    assert vc_v2.version == 2
+    assert resp.status_code == 200
+
