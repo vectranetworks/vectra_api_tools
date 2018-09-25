@@ -143,7 +143,7 @@ class VectraClient(object):
         :param targets_key_asset: host is targeting key asset (bool)
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
-        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (int)
+        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
 
         if self.version == 2:
@@ -275,7 +275,7 @@ class VectraClient(object):
         :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
         :param threat: threat score (int)
         :param threat_gte threat score is greater than or equal to (int)
-        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (int)
+        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
 
         if self.version == 2:
