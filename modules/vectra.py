@@ -375,6 +375,19 @@ class VectraClient(object):
                             verify=False)
 
     @validate_api_v2
+    def get_all_rules(self):
+        """
+        Generator to retrieve all rules page by page
+        """
+        resp = self.get_rules()
+        yield resp
+        while resp.json()['next']:
+            url = resp.json()['next']
+            path = url.replace(self.url, '')
+            resp = self.custom_endpoint(path=path)
+            yield resp
+
+    @validate_api_v2
     @request_error_handler
     def create_rule(self, detection_category=None, detection_type=None, triage_category=None, description=None,
                     is_whitelist=False, ip=[], host=[], sensor_luid=[], all_hosts=False, **kwargs):
