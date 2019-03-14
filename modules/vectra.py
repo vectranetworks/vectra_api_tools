@@ -68,6 +68,25 @@ class VectraClient(object):
         else:
             raise RuntimeError("At least one form of authentication is required. Please provide a token or username"
                                " and password")
+    @validate_api_v2
+    @request_error_handler
+    def mark_detections_fixed(self, detection_ids=None):
+        return self._toggle_detections_fixed(detection_ids, True)
+
+    @validate_api_v2
+    @request_error_handler
+    def unmark_detections_fixed(self, detection_ids=None):
+        return self._toggle_detections_fixed(detection_ids, False)
+
+    def _toggle_detections_fixed(self, detection_ids, fixed):
+        headers = self.headers.copy()
+        headers.update({
+            'Content-Type': "application/json",
+        })
+        payload = {'detectionIdList': detection_ids, 'mark_as_fixed': str(fixed)}
+
+        return requests.patch('{url}/detections'.format(url=self.url), data=json.dumps(payload), headers=headers,
+                             verify=self.verify)
 
     @staticmethod
     def _generate_host_params(args):

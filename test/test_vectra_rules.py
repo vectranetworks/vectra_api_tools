@@ -84,8 +84,8 @@ def test_update_rule_append(vc_v2, test_host):
 
 
 def test_delete_rule(vc_v2):
-    resp1 = vc_v2.delete_rule(rule_id=test_vars['host_rule_id']).json()
-    resp2 = vc_v2.delete_rule(rule_id=test_vars['host_rule_ip']).json()
-    resp3 = vc_v2.delete_rule(rule_id=test_vars['host_rule_all_hosts']).json()
+    resp1 = vc_v2.delete_rule(rule_id=test_vars['host_rule_id'])
+    resp2 = vc_v2.delete_rule(rule_id=test_vars['host_rule_ip'])
+    resp3 = vc_v2.delete_rule(rule_id=test_vars['host_rule_all_hosts'])
 
-    assert all(resp['_meta']['level'] == 'success' for resp in [resp1, resp2, resp3])
+    assert all(resp.status_code == 204 for resp in [resp1, resp2, resp3])

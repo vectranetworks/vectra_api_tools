@@ -51,3 +51,19 @@ def test_get_detections_note_modified_apiv2(vc_v2):
     assert vc_v2.version == 2
     assert resp.status_code == 200
 
+
+def test_mark_detections_as_fixed(vc_v2):
+    resp = vc_v2.get_detections()
+    assert resp.status_code == 200
+    det_ids = [d['id'] for d in resp.json()['results']]
+
+    assert vc_v2.mark_detections_fixed(detection_ids=det_ids).status_code == 200
+    resp = vc_v2.get_detections()
+    assert resp.status_code == 200
+    assert all([d['state'] == 'fixed' for d in resp.json()['results']])
+
+    assert vc_v2.unmark_detections_fixed(detection_ids=det_ids).status_code == 200
+    resp = vc_v2.get_detections()
+    assert resp.status_code == 200
+    results = resp.json()['results']
+    assert not any([d['state'] == 'fixed' for d in resp.json()['results']])
