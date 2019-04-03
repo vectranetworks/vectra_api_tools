@@ -601,10 +601,14 @@ class VectraClient(object):
         """
         Update group
         :param group_id: id of group to update
-        :param append: set to True if appending to existing list (boolean)
-        :param hosts: list of host ids to add to group
+        :param name: name of group
+        :param description: description of the group
+        :param type: type of the group to create #TODO specify what type
+        :param members: list of host ids to add to group
         :param rules: list of rule ids to add to group
+        :param append: set to True if appending to existing list (boolean)
         """
+        valid_keys = ['name', 'description', 'type', 'members', 'rules']
 
         group = self.get_group_by_id(group_id = group_id).json()
         try:
@@ -613,12 +617,15 @@ class VectraClient(object):
             raise KeyError('Group with id {} was not found'.format(str(group_id)))
 
         for k, v in kwargs.items():
-            if not isinstance(v, list):
-                raise TypeError('{} must be of type: list'.format(k))
-            if append:
-                group[k] += self._transform_hosts(v) if k == 'members' else v
+            if k in valid_keys and v is not None:
+                if k in ['members', 'rules'] and not isinstance(v, list):
+                    raise TypeError('{} must be of type: list'.format(k))
+                if append:
+                    group[k] += self._transform_hosts(v) if k == 'members' else v
+                else:
+                    group[k] = v
             else:
-                group[k] = v
+                raise KeyError('Key {} is not valid'.format(k))
 
         return requests.patch('{url}/groups/{id}'.format(url=self.url, id=id), headers=self.headers, json=group,
                             verify=self.verify)
