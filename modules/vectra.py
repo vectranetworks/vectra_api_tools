@@ -10,7 +10,7 @@ def request_error_handler(func):
     def request_handler(self, **kwargs):
         response = func(self, **kwargs)
 
-        if response.status_code in [200, 201]:
+        if response.status_code in [200, 201, 204]:
             return response
         else:
             # TODO implement exception class to more gracefully handle exception
@@ -20,9 +20,9 @@ def request_error_handler(func):
 
 
 def validate_api_v2(func):
-    def api_validator(self, **kwargs):
+    def api_validator(self, *args, **kwargs):
         if self.version == 2:
-            return func(self, **kwargs)
+            return func(self, *args, **kwargs)
         else:
             raise NotImplementedError('Method only accessible via v2 of API')
 
