@@ -538,9 +538,7 @@ class VectraClient(object):
         Groups do not implement pagination
         For consistency's sake, we still implement a generator
         """
-        resp = self._get_request(url = '{url}/groups'.format(url=self.url))
-        for group in resp.json():
-            yield group
+        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=False)
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
