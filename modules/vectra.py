@@ -522,6 +522,122 @@ class VectraClient(object):
         return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
                                verify=self.verify)
 
+        @validate_api_v2
+    @request_error_handler
+    def get_group_by_id(self, group_id):
+        """
+        Get groups by id
+        :param rule_id: id of group to retrieve
+        """
+        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=False)
+
+    @validate_api_v2
+    def get_all_groups(self):
+        """
+        Get all existing get_all_groups
+        Groups do not implement pagination
+        For consistency's sake, we still implement a generator
+        """
+        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=False)
+
+    @validate_api_v2
+    def get_groups_by_name(self, name=None, description=None):
+        """
+        Get groups by name or description
+        Condition are to be read as OR
+        :param name: Name of group
+        :param description: Description of the group
+        """
+        groups = []
+        for group in self.get_all_groups():
+            if group['name'] is not None and group['name'] == name:
+                groups.append(group)
+            elif group['description'] is not None and group['description'] == description:
+                groups.append(group)
+        return groups
+
+    @validate_api_v2
+    @request_error_handler
+    def create_group(self, name=None, description='', type='host', members=[], rules=[], **kwargs):
+        """
+        Create group
+        :param name: name of the group to create
+        :param description: description of the group
+        :param type: type of the group to create #TODO specify what type
+        :param members: list of host ids to add to group
+        :param rules: list of triage rule ids to add to group
+        :returns request object
+        """
+        if not name:
+            raise KeyError("missing required parameter: name")
+        if not isinstance(members, list):
+            raise TypeError("members must be type: list")
+        if not isinstance(rules, list):
+            raise TypeError("rules must be type: list")
+
+        # TODO migrate detection to detection_type
+        # TODO change description to name
+        payload = {
+            "name": name,
+            "description": description,
+            "type": type,
+            "members": members,
+            "rules": rules,
+        }
+
+        for k, v in kwargs.items():
+            if not type(v) == list:
+                raise TypeError("{} must be of type: list".format(k))
+            payload[k] = v
+
+        return requests.post('{url}/groups'.format(url=self.url), headers=self.headers, json=payload,
+                             verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_group(self, group_id, append=False, **kwargs):
+        """
+        Update group
+        :param group_id: id of group to update
+        :param name: name of group
+        :param description: description of the group
+        :param type: type of the group to create #TODO specify what type
+        :param members: list of host ids to add to group
+        :param rules: list of rule ids to add to group
+        :param append: set to True if appending to existing list (boolean)
+        """
+        valid_keys = ['name', 'description', 'type', 'members', 'rules']
+
+        group = self.get_group_by_id(group_id = group_id).json()
+        try:
+            id = group['id']
+        except KeyError:
+            raise KeyError('Group with id {} was not found'.format(str(group_id)))
+
+        for k, v in kwargs.items():
+            if k in valid_keys and v is not None:
+                if k in ['members', 'rules'] and not isinstance(v, list):
+                    raise TypeError('{} must be of type: list'.format(k))
+                if append:
+                    group[k] += self._transform_hosts(v) if k == 'members' else v
+                else:
+                    group[k] = v
+            else:
+                raise KeyError('Key {} is not valid'.format(k))
+
+        return requests.patch('{url}/groups/{id}'.format(url=self.url, id=id), headers=self.headers, json=group,
+                            verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def delete_group(self, group_id=None):
+        """
+        Delete group
+        :param group_id:
+        detections
+        """
+        return requests.delete('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
+
     @validate_api_v2
     @request_error_handler
     def get_proxies(self, proxy_id=None):
