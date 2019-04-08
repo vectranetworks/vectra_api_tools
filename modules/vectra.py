@@ -7,8 +7,8 @@ warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 
 def request_error_handler(func):
-    def request_handler(self, **kwargs):
-        response = func(self, **kwargs)
+    def request_handler(self, *args, **kwargs):
+        response = func(self, *args, **kwargs)
 
         if response.status_code in [200, 201, 204]:
             return response
@@ -68,6 +68,7 @@ class VectraClient(object):
         else:
             raise RuntimeError("At least one form of authentication is required. Please provide a token or username"
                                " and password")
+                               
     @validate_api_v2
     @request_error_handler
     def mark_detections_fixed(self, detection_ids=None):
@@ -133,6 +134,17 @@ class VectraClient(object):
                 transformed_list.append(host)
         return transformed_list
 
+    @validate_api_v2
+    @request_error_handler
+    def _get_request(self, url, **kwargs):
+        params = {}
+        for k, v in kwargs.items():
+            params[k] = v
+        if self.version == 2:
+            return requests.get(url, headers=self.headers, params=params, verify=self.verify)
+        else:
+            return requests.get(url, auth=self.auth, params=params, verify=self.verify)
+
     # TODO Consolidate get methods
     @request_error_handler
     def get_hosts(self, **kwargs):
@@ -180,9 +192,7 @@ class VectraClient(object):
         resp = self.get_hosts(**kwargs)
         yield resp
         while resp.json()['next']:
-            url = resp.json()['next']
-            path = url.replace(self.url, '')
-            resp = self.custom_endpoint(path=path)
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @request_error_handler
@@ -312,9 +322,7 @@ class VectraClient(object):
         resp = self.get_detections(**kwargs)
         yield resp
         while resp.json()['next']:
-            url = resp.json()['next']
-            path = url.replace(self.url, '')
-            resp = self.custom_endpoint(path=path)
+            resp = self._get_request(url = resp.json()['next'])
             yield resp
 
     @request_error_handler
@@ -379,31 +387,57 @@ class VectraClient(object):
     def get_rules(self, name=None, rule_id=None):
         """
         Get triage rules
-        :param name: name of triage rule to retrieve
+        This function was only kept for backwards compatibility
+        :param name: description of triage rule to retrieve
         :param rule_id: id of triage rule to retrieve
+        Returns a <Response> object if rule_id is set
+        Returns a dict object if name is set (and matches on rule description)
         """
         if rule_id:
-            return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
+            return self.get_rule_by_id(rule_id)
         elif name:
-            for rule in requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                            verify=False).json()['results']:
-                if rule['description'] == name:
-                    return rule
+            # The fucntion get_rules_by_name () return a list of all matching rules
+            # For backwards compatibility we return only the first
+            # CAUTION: we match based on description, and not the actual name
+            return self.get_rules_by_name(description = name)[0]
         else:
-            return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                            verify=False)
+            raise KeyError("one of the following required: name, rule_id")
+
+    @validate_api_v2
+    @request_error_handler
+    def get_rule_by_id(self, rule_id):
+        """
+        Get triage rules by id
+        :param rule_id: id of triage rule to retrieve
+        """
+        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
+
+    @validate_api_v2
+    def get_rules_by_name(self, triage_category=None, description=None):
+        """
+        Get triage rules by name or description
+        Condition are to be read as OR
+        :param triage_category: 'Triage as' field of filter
+        :param description: Description of the triage filter
+        """
+        rules = []
+        for page in self.get_all_rules():
+            for rule in page.json()['results']:
+                if rule['description'] is not None and rule['description'] == description:
+                    rules.append(rule)
+                elif rule['triage_category'] is not None and rule['triage_category'] == triage_category:
+                    rules.append(rule)
+        return rules
 
     @validate_api_v2
     def get_all_rules(self):
         """
         Generator to retrieve all rules page by page
         """
-        resp = self.get_rules()
+        resp = self._get_request(url = '{url}/rules'.format(url=self.url))
         yield resp
         while resp.json()['next']:
-            url = resp.json()['next']
-            path = url.replace(self.url, '')
-            resp = self.custom_endpoint(path=path)
+            resp = self._get_request(url = resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -485,11 +519,21 @@ class VectraClient(object):
         :param remote1_dns: destination hostnames to triage
         :param remote1_port: destination ports to  triage
         """
-        if not rule_id and not name:
+        id = None
+        if name:
+            matching_rules = self.get_rules_by_name(triage_category=name)
+            if len(matching_rules) > 1:
+                raise Exception('More than one rule matching the name')
+            elif len(matching_rules) < 1:
+                raise Exception('No rule matching the search')
+            else:
+                id = matching_rules[0]['id']
+        elif rule_id:
+            id = rule_id
+        else:
             raise ValueError("rule name or id must be provided")
 
-        id = self.get_rules(name=name)['id'] if name else rule_id
-        rule = self.get_rules(rule_id=id).json()
+        rule = self.get_rule_by_id(rule_id=id).json()
 
         valid_keys = ['ip', 'host', 'sensor_luid', 'remote1_ip', 'remote1_dns', 'remote1_port']
 
@@ -500,7 +544,10 @@ class VectraClient(object):
                 raise TypeError('{} must be of type: list'.format(k))
 
             if append:
-                rule[k] += self._transform_hosts(v) if k == 'host' else v
+                if k == 'host':
+                    rule[k] += self._transform_hosts(v)
+                else:
+                    rule[k] += v
             else:
                 rule[k] = v
 
@@ -521,6 +568,122 @@ class VectraClient(object):
 
         return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
                                verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def get_group_by_id(self, group_id):
+        """
+        Get groups by id
+        :param rule_id: id of group to retrieve
+        """
+        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=False)
+
+    @validate_api_v2
+    def get_all_groups(self):
+        """
+        Get all existing get_all_groups
+        Groups do not implement pagination
+        For consistency's sake, we still implement a generator
+        """
+        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=False)
+
+    @validate_api_v2
+    def get_groups_by_name(self, name=None, description=None):
+        """
+        Get groups by name or description
+        Condition are to be read as OR
+        :param name: Name of group
+        :param description: Description of the group
+        """
+        groups = []
+        for group in self.get_all_groups():
+            if group['name'] is not None and group['name'] == name:
+                groups.append(group)
+            elif group['description'] is not None and group['description'] == description:
+                groups.append(group)
+        return groups
+
+    @validate_api_v2
+    @request_error_handler
+    def create_group(self, name=None, description='', type='host', members=[], rules=[], **kwargs):
+        """
+        Create group
+        :param name: name of the group to create
+        :param description: description of the group
+        :param type: type of the group to create #TODO specify what type
+        :param members: list of host ids to add to group
+        :param rules: list of triage rule ids to add to group
+        :returns request object
+        """
+        if not name:
+            raise KeyError("missing required parameter: name")
+        if not isinstance(members, list):
+            raise TypeError("members must be type: list")
+        if not isinstance(rules, list):
+            raise TypeError("rules must be type: list")
+
+        # TODO migrate detection to detection_type
+        # TODO change description to name
+        payload = {
+            "name": name,
+            "description": description,
+            "type": type,
+            "members": members,
+            "rules": rules,
+        }
+
+        for k, v in kwargs.items():
+            if not type(v) == list:
+                raise TypeError("{} must be of type: list".format(k))
+            payload[k] = v
+
+        return requests.post('{url}/groups'.format(url=self.url), headers=self.headers, json=payload,
+                             verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_group(self, group_id, append=False, **kwargs):
+        """
+        Update group
+        :param group_id: id of group to update
+        :param name: name of group
+        :param description: description of the group
+        :param type: type of the group to create #TODO specify what type
+        :param members: list of host ids to add to group
+        :param rules: list of rule ids to add to group
+        :param append: set to True if appending to existing list (boolean)
+        """
+        valid_keys = ['name', 'description', 'type', 'members', 'rules']
+
+        group = self.get_group_by_id(group_id = group_id).json()
+        try:
+            id = group['id']
+        except KeyError:
+            raise KeyError('Group with id {} was not found'.format(str(group_id)))
+
+        for k, v in kwargs.items():
+            if k in valid_keys and v is not None:
+                if k in ['members', 'rules'] and not isinstance(v, list):
+                    raise TypeError('{} must be of type: list'.format(k))
+                if append:
+                    group[k] += self._transform_hosts(v) if k == 'members' else v
+                else:
+                    group[k] = v
+            else:
+                raise KeyError('Key {} is not valid'.format(k))
+
+        return requests.patch('{url}/groups/{id}'.format(url=self.url, id=id), headers=self.headers, json=group,
+                            verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def delete_group(self, group_id=None):
+        """
+        Delete group
+        :param group_id:
+        detections
+        """
+        return requests.delete('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -655,7 +818,6 @@ class VectraClient(object):
                              files={'file': open(stix_file)}, verify=self.verify)
 
     @validate_api_v2
-    @request_error_handler
     def advanced_search(self, stype=None, page_size=50, query=None):
         """
         Advanced search
@@ -666,20 +828,11 @@ class VectraClient(object):
         """
         if stype not in ["hosts", "detections"]:
             raise ValueError("Supported values for stype are hosts or detections")
-        return requests.get('{url}/search/{stype}/?page_size={ps}&query_string={query}'.format(url=self.url, stype=stype,
-                                                ps=page_size, query=query),
-                            headers=self.headers, verify=self.verify)
 
-    @request_error_handler
-    def custom_endpoint(self, path=None, **kwargs):
-        if not str(path).startswith('/'):
-            path = '/' + str(path)
-
-        params = {}
-        for k, v in kwargs.items():
-            params[k] = v
-
-        if self.version == 2:
-            return requests.get(self.url + path, headers=self.headers, params=params, verify=self.verify)
-        else:
-            return requests.get(self.url + path, auth=self.auth, params=params, verify=self.verify)
+        url = '{url}/search/{stype}/?page_size={ps}&query_string={query}'.format(url=self.url, stype=stype,
+                                                ps=page_size, query=query)
+        resp = self._get_request(url=url)
+        yield resp
+        while resp.json()['next']:
+            resp = self._get_request(url=resp.json()['next'])
+            yield resp
