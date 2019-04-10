@@ -267,6 +267,55 @@ class VectraClient(object):
 
         return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=headers,
                               data=json.dumps(payload), verify=self.verify)
+    
+    @validate_api_v2
+    @request_error_handler
+    def get_host_note(self, host_id=None):
+        """
+        Get host notes
+        :param host_id:
+        For consistency we return a requests.models.Response object
+        As we do not want to return the complete host body, we alter the response content
+        """
+        host = requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, verify=self.verify)
+        host_note = host.json()['note']
+        # JSON encodes newline as \\n
+        # If there is no note, we encode as empty
+        host_note = host_note.replace('\n', '\\n') if host_note else ''
+        json_dict = '{{"status": "success", "host_id": "{}", "note":"{}"}}'.format(host_id,host_note)
+        host._content = json_dict.encode('utf-8')
+        return host
+
+    @validate_api_v2
+    @request_error_handler
+    def set_host_note(self, host_id=None, note='', append=False):
+        """
+        Set host note
+        :param host_id:
+        :param note: content of the note to set
+        :param append: overwrites existing note if set to False, appends if set to True
+        Set to empty note string to clear host note
+        """
+        if append and isinstance(note, str):
+            current_note = self.get_host_note(host_id=host_id).json()['note']
+            payload = {
+                "note": current_note + '\n' + note if current_note != '' else note
+            }
+        elif isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('note must be of type str')
+
+        headers = self.headers.copy()
+        headers.update({
+            'Content-Type': "application/json",
+            'Cache-Control': "no-cache"
+        })
+
+        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=headers, data=json.dumps(payload),
+                                      verify=self.verify)
 
     # TODO consolidate get methods
     @request_error_handler
