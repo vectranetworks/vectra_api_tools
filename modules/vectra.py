@@ -549,13 +549,14 @@ class VectraClient(object):
         :param description: Description of the group
         """
         groups = []
-        for group in self.get_all_groups():
-            if group['name'] is not None and group['name'] == name:
-                groups.append(group)
-            elif group['description'] is not None and group['description'] == description:
-                groups.append(group)
+        for page in self.get_all_groups():
+            for group in page.json():
+                if group['name'] is not None and group['name'] == name:
+                    groups.append(group)
+                elif group['description'] is not None and group['description'] == description:
+                    groups.append(group)
         return groups
-
+    
     @validate_api_v2
     @request_error_handler
     def create_group(self, name=None, description='', type='host', members=[], rules=[], **kwargs):
