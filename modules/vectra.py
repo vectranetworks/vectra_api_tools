@@ -133,6 +133,17 @@ class VectraClient(object):
                 transformed_list.append(host)
         return transformed_list
 
+    @validate_api_v2
+    @request_error_handler
+    def _get_request(self, url, **kwargs):
+        params = {}
+        for k, v in kwargs.items():
+            params[k] = v
+        if self.version == 2:
+            return requests.get(url, headers=self.headers, params=params, verify=self.verify)
+        else:
+            return requests.get(url, auth=self.auth, params=params, verify=self.verify)
+    
     # TODO Consolidate get methods
     @request_error_handler
     def get_hosts(self, **kwargs):
@@ -522,7 +533,7 @@ class VectraClient(object):
         return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
                                verify=self.verify)
 
-        @validate_api_v2
+    @validate_api_v2
     @request_error_handler
     def get_group_by_id(self, group_id):
         """
@@ -534,11 +545,13 @@ class VectraClient(object):
     @validate_api_v2
     def get_all_groups(self):
         """
-        Get all existing get_all_groups
-        Groups do not implement pagination
-        For consistency's sake, we still implement a generator
+        Generator to retrieve all Groups page by page
         """
-        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=False)
+        resp = self._get_request(url = '{url}/groups'.format(url=self.url))
+        yield resp
+        while resp.json()['next']:
+            resp = self._get_request(url = resp.json()['next'])
+            yield resp
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
@@ -550,13 +563,13 @@ class VectraClient(object):
         """
         groups = []
         for page in self.get_all_groups():
-            for group in page.json():
+            for group in page.json()['results']:
                 if group['name'] is not None and group['name'] == name:
                     groups.append(group)
                 elif group['description'] is not None and group['description'] == description:
                     groups.append(group)
         return groups
-    
+
     @validate_api_v2
     @request_error_handler
     def create_group(self, name=None, description='', type='host', members=[], rules=[], **kwargs):
