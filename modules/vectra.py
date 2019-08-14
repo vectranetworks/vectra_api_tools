@@ -235,7 +235,7 @@ class VectraClient(object):
         :param host_id:
         """
         return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
-                            verify=False)
+                            verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -342,7 +342,7 @@ class VectraClient(object):
         :param detection_id:
         """
         return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
-                            verify=False)
+                            verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -383,15 +383,15 @@ class VectraClient(object):
         :param rule_id: id of triage rule to retrieve
         """
         if rule_id:
-            return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=False)
+            return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=self.verify)
         elif name:
             for rule in requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                            verify=False).json()['results']:
+                            verify=self.verify).json()['results']:
                 if rule['description'] == name:
                     return rule
         else:
             return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                            verify=False)
+                            verify=self.verify)
 
     @validate_api_v2
     def get_all_rules(self):
@@ -529,7 +529,7 @@ class VectraClient(object):
         Get groups by id
         :param rule_id: id of group to retrieve
         """
-        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=False)
+        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_all_groups(self):
@@ -538,7 +538,7 @@ class VectraClient(object):
         Groups do not implement pagination
         For consistency's sake, we still implement a generator
         """
-        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=False)
+        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
@@ -556,7 +556,7 @@ class VectraClient(object):
                 elif group['description'] is not None and group['description'] == description:
                     groups.append(group)
         return groups
-    
+
     @validate_api_v2
     @request_error_handler
     def create_group(self, name=None, description='', type='host', members=[], rules=[], **kwargs):
