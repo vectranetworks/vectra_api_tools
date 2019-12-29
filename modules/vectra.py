@@ -465,17 +465,6 @@ class VectraClient(object):
         Returns a dict object if name is set (and matches on rule description)
         """
         if rule_id:
-<<<<<<< HEAD
-            return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, verify=self.verify)
-        elif name:
-            for rule in requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                            verify=self.verify).json()['results']:
-                if rule['description'] == name:
-                    return rule
-        else:
-            return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                            verify=self.verify)
-=======
             return self.get_rule_by_id(rule_id)
         elif name:
             # The fucntion get_rules_by_name () return a list of all matching rules
@@ -510,7 +499,6 @@ class VectraClient(object):
                 elif rule['triage_category'] is not None and rule['triage_category'] == triage_category:
                     rules.append(rule)
         return rules
->>>>>>> upstream/master
 
     @validate_api_v2
     def get_all_rules(self):
@@ -666,15 +654,11 @@ class VectraClient(object):
         """
         Generator to retrieve all Groups page by page
         """
-<<<<<<< HEAD
-        yield requests.get('{url}/groups'.format(url=self.url), headers=self.headers, verify=self.verify)
-=======
         resp = self._get_request(url = '{url}/groups'.format(url=self.url))
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url = resp.json()['next'])
             yield resp
->>>>>>> upstream/master
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
