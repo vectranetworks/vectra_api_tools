@@ -11,7 +11,7 @@ setup(
     name='vectra-api-tools',
     description='Vectra API client library',
     long_description=long_desc,
-    version='1.0rc7',
+    version='1.1rc0',
     author='Vectra',
     author_email='tme@vectra.ai',
     url='https://github.com/vectranetworks/vectra_api_tools',
