@@ -8,7 +8,11 @@ import re
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 class HTTPException(Exception):
-    def __init__(self,status_code, response):
+    def __init__(self, response):
+        """ 
+        Custom exception class to report possible API errors
+        The body is contructed by extracting the API error code from the requests.Response object
+        """
         try: 
             r = response.json()
             if 'detail' in r:
@@ -19,10 +23,11 @@ class HTTPException(Exception):
                 detail = r['_meta']['message']
             else:
                 detail = response.content
-        except: 
+        except Exception: 
             detail = response.content
-        body = 'Status code: {code} - {detail}'.format(code=str(status_code), detail=detail)
-        Exception.__init__(self, body)
+        body = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
+        super(HTTPException, self).__init__(body)
+
 
 def request_error_handler(func):
     def request_handler(self, *args, **kwargs):
@@ -31,7 +36,7 @@ def request_error_handler(func):
         if response.status_code in [200, 201, 204]:
             return response
         else:
-            raise HTTPException(response.status_code, response)
+            raise HTTPException(response)
 
     return request_handler
 
@@ -80,8 +85,7 @@ class VectraClient(object):
         self.version = 2 if token else 1
         self.verify = verify
 
-        # Remove potential trailing slash
-        url = url[:-1] if url[-1:] == '/' else url
+        url = VectraClient._remove_trailing_slashes(url)
 
         if token:
             self.url = '{url}/api/v2'.format(url=url)
@@ -98,6 +102,11 @@ class VectraClient(object):
         else:
             raise RuntimeError("At least one form of authentication is required. Please provide a token or username"
                                " and password")
+
+    @staticmethod
+    def _remove_trailing_slashes(url):
+        url = url[:-1] if url.endswith('/') else url
+        return url
 
     @staticmethod
     def _generate_campaign_params(args):
@@ -971,7 +980,7 @@ class VectraClient(object):
         response = requests.get('{url}/detections/{id}/pcap'.format(url=self.url, id=detection_id), headers=self.headers,
                             verify=False)
         if response.status_code not in [200, 201, 204]:
-            raise HTTPException(response.status_code, response)
+            raise HTTPException(response)
 
         with open(filename, 'wb') as f:
             f.write(response.content)
@@ -1605,7 +1614,7 @@ class VectraClient(object):
                 if feed['name'].lower() == name.lower():
                     return feed['id']
         else:
-            raise HTTPException(response.status_code, response)
+            raise HTTPException(response)
 
     @validate_api_v2
     @request_error_handler
@@ -1785,7 +1794,7 @@ class VectraClientV2_1(VectraClient):
         """
         super().__init__(url=url, token=token, verify=verify)
         # Remove potential trailing slash
-        url = url[:-1] if url[-1:] == '/' else url
+        url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
         self.url = '{url}/api/v2.1'.format(url=url)
 
