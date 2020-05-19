@@ -2,7 +2,6 @@ import json
 import requests
 import warnings
 import html
-import sys
 import re
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
@@ -26,7 +25,7 @@ class HTTPException(Exception):
         except Exception: 
             detail = response.content
         body = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
-        super(HTTPException, self).__init__(body)
+        super().__init__(body)
 
 
 def request_error_handler(func):
@@ -50,15 +49,6 @@ def validate_api_v2(func):
 
     return api_validator
 
-
-def validate_python_v3(func):
-    def python_validator(self, *args, **kwargs):
-        if sys.version_info >= (3, 0):
-            return func(self, *args, **kwargs)
-        else:
-            raise NotImplementedError('Method only compatible with Python 3')
-
-    return python_validator
 
 def deprecation(message):
     warnings.warn(message, PendingDeprecationWarning)
@@ -592,7 +582,6 @@ class VectraClient(object):
                             verify=False)
 
     @validate_api_v2
-    @validate_python_v3
     @request_error_handler
     def get_host_note(self, host_id=None):
         """
@@ -615,7 +604,6 @@ class VectraClient(object):
         return host
 
     @validate_api_v2
-    @validate_python_v3
     @request_error_handler
     def set_host_note(self, host_id=None, note='', append=False):
         """
@@ -916,7 +904,6 @@ class VectraClient(object):
                             verify=False)
 
     @validate_api_v2
-    @validate_python_v3
     @request_error_handler
     def get_detection_note(self, detection_id=None):
         """
@@ -935,7 +922,6 @@ class VectraClient(object):
         return detection
 
     @validate_api_v2
-    @validate_python_v3
     @request_error_handler
     def set_detection_note(self, detection_id=None, note='', append=False):
         """
@@ -1977,7 +1963,6 @@ class VectraClientV2_1(VectraClient):
         return requests.delete('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
                             verify=False)
 
-    @validate_python_v3
     @request_error_handler
     def get_account_note(self, account_id=None):
         """
