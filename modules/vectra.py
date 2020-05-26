@@ -1060,7 +1060,8 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = self.get_rules(**kwargs)
+        resp = requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+                                params=self._generate_rule_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url = resp.json()['next'])
@@ -1271,7 +1272,8 @@ class VectraClient(object):
         :param page_size: number of object to return in repsonse (int)
         :param type: type of group to search (domain/host/ip)
         """
-        resp = self.get_groups(**kwargs)
+        resp = requests.get('{url}/groups'.format(url=self.url), headers=self.headers,
+                            params=self._generate_group_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url = resp.json()['next'])
