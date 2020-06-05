@@ -1,16 +1,13 @@
 from setuptools import setup
 
-long_desc="""
-_Vectra API Tools_ is set of resources that is designed to save time and repetitive work by providing a python library that simplifies interaction with the Vectra API. Current modules available:  
-    - _cli.py_ is a set of common parameters which can be imported into scripts which are designed to be run from the command line
-    - _stix_taxii.py_ is a module that provides a taxii client to ingest threat feeds and write to STIX file
-    - _vectra.py_ is module that provides methods that simplify interaction with the Vectra API. There are methods to support most entities including hosts, accounts, detections, and advanced search.
-"""
+with open('README.md', 'r') as fh:
+    long_desc = fh.read()
 
 setup(
     name='vectra-api-tools',
     description='Vectra API client library',
     long_description=long_desc,
+    long_description_content_type='text/markdown',
     version='2.0rc1',
     author='Vectra',
     author_email='tme@vectra.ai',
