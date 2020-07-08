@@ -1761,7 +1761,7 @@ class VectraClient(object):
         """
         Get health statistics for the appliance
         :param check: specific check to run - optional
-        CAUTION: the check parameter is broken for the time being
+            possible values are: cpu, disk, hostid, memory, network, power, sensors, system
         """
         if not check:
             return requests.get('{url}/health'.format(url=self.url), headers=self.headers, verify=self.verify)
