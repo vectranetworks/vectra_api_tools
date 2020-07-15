@@ -2259,3 +2259,20 @@ class VectraClientV2_1(VectraClient):
         """
         return requests.get('{url}/usage/detect'.format(url=self.url), params=self._generate_detect_usage_params(kwargs), 
             headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def get_audits(self, start_date=None, end_date=None):
+        """
+        Get audits between start_date and end_date, inclusive
+        :param start_date: start date (datetime.date), GMT, defaults to date.min
+        :param end_date: end date (datetime.date), GMT, defaults to date.max
+        """
+        if start_date is None and end_date is None:
+            return requests.get('{url}/audits'.format(url=self.url), headers=self.headers, verify=self.verify)
+        elif start_date is None and end_date is not None:
+            return requests.get('{url}/audits?end={end}'.format(url=self.url, end=end_date.isoformat()), headers=self.headers, verify=self.verify)
+        elif start_date is not None and end_date is None:
+            return requests.get('{url}/audits?start={start}'.format(url=self.url, start=start_date.isoformat()), headers=self.headers, verify=self.verify)
+        else:
+            return requests.get('{url}/audits?start={start}&end={end}'.format(url=self.url, start=start_date.isoformat(), end=end_date.isoformat()), headers=self.headers, verify=self.verify)
+
