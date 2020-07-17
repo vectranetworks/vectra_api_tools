@@ -11,7 +11,7 @@ The current repository is broken down into the following:
 https://github.com/vectranetworks/vectra_api_tools/wiki
 
 **Current version**  
-2.0rc2
+2.0rc3
 
 **License**  
 Apache 2
