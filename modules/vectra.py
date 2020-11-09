@@ -661,7 +661,7 @@ class VectraClient(object):
             is_targeting_key_asset, src_account, src_host, note, note_modified_by, 
             note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
             assigned_date, groups, is_marked_custom, is_custom_model
-        :param host_id: detection id (int)
+        :param host_id: host id (int)
         :param is_targeting_key_asset: detection is targeting key asset (bool)
         :param is_triaged: detection is triaged
         :param last_timestamp: timestamp of last activity on detection (datetime)
@@ -2066,7 +2066,7 @@ class VectraClientV2_1(VectraClient):
     # when source_conditions and/or additional_conditions are empty -  APP-11016
     @request_error_handler
     def create_rule(self, detection_category=None, detection_type=None, triage_category=None, 
-        source_conditions={'OR':[]}, additional_conditions={'OR':[]}, is_whitelist=False, **kwargs):
+        source_conditions={'OR':[]}, additional_conditions=None, is_whitelist=False, **kwargs):
         """
         Create triage rule
         :param detection_category: detection category to triage
@@ -2275,4 +2275,3 @@ class VectraClientV2_1(VectraClient):
             return requests.get('{url}/audits?start={start}'.format(url=self.url, start=start_date.isoformat()), headers=self.headers, verify=self.verify)
         else:
             return requests.get('{url}/audits?start={start}&end={end}'.format(url=self.url, start=start_date.isoformat(), end=end_date.isoformat()), headers=self.headers, verify=self.verify)
-
