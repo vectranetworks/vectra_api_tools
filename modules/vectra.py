@@ -1728,8 +1728,7 @@ class VectraClient(object):
     @request_error_handler
     def set_internal_networks(self, include=[], exclude=[], drop=[], append=True):
         """
-        Get all internal networks configured on the brain
-        Set account tags
+        Set internal networks configured on the brain
         :param include: list of subnets to add  the internal subnets list
         :param exclude: list of subnets to exclude from the internal subnets list
         :param drop: list of subnets to add to the drop list
