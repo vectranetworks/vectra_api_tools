@@ -1612,7 +1612,9 @@ class VectraClient(object):
         :param feed_id: id of threat feed (returned by get_feed_by_name)
         :param stix_file: stix filename
         """
-        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
+        headers = self.headers.copy()
+        del(headers['Content-Type'])
+        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=headers,
                              files={'file': open(stix_file)}, verify=self.verify)
 
     @validate_api_v2
