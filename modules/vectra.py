@@ -1610,7 +1610,7 @@ class VectraClient(object):
         """
         Uploads STIX file to new threat feed or overwrites STIX file in existing threat feed
         :param feed_id: id of threat feed (returned by get_feed_by_name)
-        :param stix_file: stix filename
+        :param stix_file: stix file handle
         """
         return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
                              files={'file': open(stix_file)}, verify=self.verify)
