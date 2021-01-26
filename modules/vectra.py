@@ -3,7 +3,9 @@ import requests
 import warnings
 import html
 import re
+import copy
 import ipaddress
+
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
@@ -1613,7 +1615,9 @@ class VectraClient(object):
         :param feed_id: id of threat feed (returned by get_feed_by_name)
         :param stix_file: stix filename
         """
-        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=self.headers,
+        headers = copy.deepcopy(self.headers)
+        headers.pop('Content-Type', None)
+        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=headers,
                              files={'file': open(stix_file)}, verify=self.verify)
 
     @validate_api_v2
