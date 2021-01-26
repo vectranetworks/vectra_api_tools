@@ -2282,3 +2282,196 @@ class VectraClientV2_1(VectraClient):
             return requests.get('{url}/audits?start={start}'.format(url=self.url, start=start_date.isoformat()), headers=self.headers, verify=self.verify)
         else:
             return requests.get('{url}/audits?start={start}&end={end}'.format(url=self.url, start=start_date.isoformat(), end=end_date.isoformat()), headers=self.headers, verify=self.verify)
+
+
+class VectraClientV2_2(VectraClientV2_1):
+
+    def __init__(self, url=None, token=None, verify=False):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        super().__init__(url=url, token=token, verify=verify)
+        # Remove potential trailing slash
+        url = VectraClient._remove_trailing_slashes(url)
+        # Set endpoint to APIv2.1
+        self.url = '{url}/api/v2.2'.format(url=url)
+
+    def get_host_note(self, host_id=None):
+        """
+        Get host notes
+        :param host_id: host ID
+        """
+        if not host_id:
+            raise ValueError('Host id required')
+
+        return requests.get('{url}/hosts/{id}/notes'.format(url=self.url, id=host_id), headers=self.headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_host_note(self, host_id=None, note=''):
+        """
+        Set host note
+        :param host_id: host ID
+        :param note: content of the note to set
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.post('{url}/hosts/{id}/notes'.format(url=self.url, id=host_id), headers=self.headers, json=payload,
+            verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_host_note(self, host_id=None, note_id=None, note=''):
+        """
+        Set host note
+        :param host_id: host ID
+        :param note_id: ID of the note to update
+        :param note: updated content of the note
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.patch('{url}/hosts/{host_id}/notes/{note_id}'.format(url=self.url, host_id=host_id, note_id=note_id), 
+            headers=self.headers, json=payload, verify=self.verify)
+    
+    @validate_api_v2
+    @request_error_handler
+    def delete_host_note(self, host_id=None, note_id=None):
+        """
+        Set host note
+        :param host_id: host ID
+        :param note_id: ID of the note to delete
+        """
+
+        return requests.delete('{url}/hosts/{host_id}/notes/{note_id}'.format(url=self.url, host_id=host_id, note_id=note_id), 
+            headers=self.headers, verify=self.verify)
+
+    def get_detection_note(self, detection_id=None):
+        """
+        Get detection notes
+        :param detection_id: detection ID
+        """
+        if not detection_id:
+            raise ValueError('detection id required')
+
+        return requests.get('{url}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_detection_note(self, detection_id=None, note=''):
+        """
+        Set detection note
+        :param detection_id: detection ID
+        :param note: content of the note to set
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.post('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, json=payload,
+            verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_detection_note(self, detection_id=None, note_id=None, note=''):
+        """
+        Set detection note
+        :param detection_id: detection ID
+        :param note_id: ID of the note to update
+        :param note: updated content of the note
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.patch('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
+            headers=self.headers, json=payload, verify=self.verify)
+    
+    @validate_api_v2
+    @request_error_handler
+    def delete_detection_note(self, detection_id=None, note_id=None):
+        """
+        Set detection note
+        :param detection_id: detection ID
+        :param note_id: ID of the note to delete
+        """
+
+        return requests.delete('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
+            headers=self.headers, verify=self.verify)
+
+    def get_account_note(self, account_id=None):
+        """
+        Get account notes
+        :param account_id: account ID
+        """
+        if not account_id:
+            raise ValueError('account id required')
+
+        return requests.get('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def set_account_note(self, account_id=None, note=''):
+        """
+        Set account note
+        :param account_id: account ID
+        :param note: content of the note to set
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.post('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, json=payload,
+            verify=self.verify)
+
+    @validate_api_v2
+    @request_error_handler
+    def update_account_note(self, account_id=None, note_id=None, note=''):
+        """
+        Set account note
+        :param account_id: account ID
+        :param note_id: ID of the note to update
+        :param note: updated content of the note
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.patch('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
+            headers=self.headers, json=payload, verify=self.verify)
+    
+    @validate_api_v2
+    @request_error_handler
+    def delete_account_note(self, account_id=None, note_id=None):
+        """
+        Set account note
+        :param account_id: account ID
+        :param note_id: ID of the note to delete
+        """
+
+        return requests.delete('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
+            headers=self.headers, verify=self.verify)
