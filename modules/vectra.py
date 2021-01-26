@@ -4,6 +4,8 @@ import warnings
 import html
 import re
 import copy
+import ipaddress
+
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
@@ -1731,13 +1733,15 @@ class VectraClient(object):
     @request_error_handler
     def set_internal_networks(self, include=[], exclude=[], drop=[], append=True):
         """
-        Get all internal networks configured on the brain
-        Set account tags
+        Set internal networks configured on the brain
         :param include: list of subnets to add  the internal subnets list
         :param exclude: list of subnets to exclude from the internal subnets list
         :param drop: list of subnets to add to the drop list
-        :param append: overwrites existing lists if set to False, appends to existing tags if set to True
+        :param append: overwrites existing lists if set to False, appends to existing lists if set to True
         """
+        # Check that all provided ranges are valid
+        all(ipaddress.ip_network(i) for i in include+exclude+drop)
+        
         if append and all(isinstance(i, list) for i in [include, exclude, drop]):
             current_list = self.get_internal_networks().json()
             # We must make all entries unique
