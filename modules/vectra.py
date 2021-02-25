@@ -677,7 +677,7 @@ class VectraClient(object):
         :param state: state of detection (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
         :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param tags: tags assigned to detection
+        :param tags: tags assigned to detections; this uses substring matching 
         :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
         :param threat: threat score (int)
         :param threat_gte threat score is greater than or equal to (int)
@@ -723,7 +723,7 @@ class VectraClient(object):
         :param state: state of detection (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
         :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param tags: tags assigned to detection
+        :param tags: tags assigned to detection; this uses substring matching
         :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
         :param threat: threat score (int)
         :param threat_gte threat score is greater than or equal to (int)
@@ -1874,7 +1874,7 @@ class VectraClientV2_1(VectraClient):
         :param state: state of host (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
         :param t_score_gte: threat score greater than or equal to (int) - will be removed with deprection of v1 of api
-        :param tags: tags assigned to host
+        :param tags: tags assigned to account
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
