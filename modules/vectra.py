@@ -1553,7 +1553,7 @@ class VectraClient(object):
         if not certainty in ['Low', 'Medium', 'High']:
             raise ValueError('Invalid certainty provided: {}'.format(str(certainty)))
 
-        if not itype in ['Anonymize', 'Exfiltration', 'Malware Artifacts', 'Watchlist']:
+        if not itype in ['Anonymize', 'Exfiltration', 'Malware Artifacts', 'Watchlist', 'C2']:
             raise ValueError('Invalid itype provided: {}'.format(str(itype)))
 
         payload = {
