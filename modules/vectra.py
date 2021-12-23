@@ -2366,7 +2366,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not detection_id:
             raise ValueError('detection id required')
 
-        return requests.get('{url}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+        return requests.get('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
