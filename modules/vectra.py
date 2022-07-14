@@ -5,6 +5,7 @@ import html
 import re
 import copy
 import ipaddress
+from requests.auth import HTTPBasicAuth
 
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
@@ -27,21 +28,30 @@ class HTTPException(Exception):
                 detail = response.content
         except Exception: 
             detail = response.content
-        body = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
-        super().__init__(body)
+        self.message = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
+        self.status_code = response.status_code
+        super().__init__(self.message)
 
+class HTTPUnauthorizedException(HTTPException):
+     def __init__(self, response):
+        super().__init__(response)
+
+class HTTPTooManyRequestsException(HTTPException):
+     def __init__(self, response):
+        super().__init__(response)
 
 def request_error_handler(func):
-    def request_handler(self, *args, **kwargs):
-        response = func(self, *args, **kwargs)
-        
-        if response.status_code in [200, 201, 204]:
-            return response
-        else:
-            raise HTTPException(response)
-
-    return request_handler
-
+        def request_handler(self, *args, **kwargs):
+            response = func(self, *args, **kwargs)
+            if response.status_code in [200, 201, 204]:
+                return response
+            elif response.status_code == 401:
+                raise HTTPUnauthorizedException(response)
+            elif response.status_code == 429:
+                raise HTTPTooManyRequestsException(response)
+            else:
+                raise HTTPException(response)
+        return request_handler
 
 def validate_api_v2(func):
     def api_validator(self, *args, **kwargs):
@@ -52,10 +62,19 @@ def validate_api_v2(func):
 
     return api_validator
 
+def renew_access_token(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except HTTPUnauthorizedException:
+            # Invoke the code responsible for get a new token.
+            self._refresh_oauth_token()
+            # Once the token is refreshed, we can retry the operation.
+            return func(self, *args, **kwargs)
+    return wrapper
 
 def deprecation(message):
     warnings.warn(message, PendingDeprecationWarning)
-
 
 def param_deprecation(key):
     message = '{0} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'.format(key)
@@ -2475,3 +2494,948 @@ class VectraClientV2_2(VectraClientV2_1):
 
         return requests.delete('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
             headers=self.headers, verify=self.verify)
+
+
+class VectraClientV3(VectraClientV2_2):
+
+    def __init__(self, url=None, client_id=None, client_secret=None, verify=False):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        # Remove potential trailing slash
+        url = VectraClientV3._remove_trailing_slashes(url)
+        # Set endpoint to APIv3
+        self.url = '{url}/api/v3'.format(url=url)
+        self.base_url = url
+        self.verify = verify
+        self.client_id = client_id
+        self.client_secret = client_secret
+        # Get the OAuth2 token
+        r_dict = VectraClientV3._get_oauth_token(url, client_id, client_secret).json()
+        access_token = r_dict.get('access_token')
+        # Save the refresh token
+        self.refresh_token = r_dict.get('refresh_token')
+        # Setup authorization in headers
+        self.headers = {
+                'Authorization': "Bearer " + access_token,
+                'Content-Type': "application/json",
+                'Cache-Control': "no-cache"
+            }
+
+    @staticmethod
+    def _generate_assignment_params(args):
+        """
+        Generate query parameters for assignment queries based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        params = {}
+        valid_keys = ['accounts', 'assignees', 'created_after', 'fields', 'max_id', 'min_id', 
+            'ordering', 'page', 'page_size', 'resolution', 'resolved']
+
+        for k, v in args.items():
+            if k in valid_keys:
+                if v is not None: params[k] = v
+            else:
+                raise ValueError('argument {} is an invalid assignment query parameter'.format(str(k)))
+        return params
+
+    @request_error_handler
+    def _refresh_oauth_token_request(self):
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': self.refresh_token
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = '{base_url}/oauth2/token'.format(base_url=self.base_url)
+        return requests.post(url, headers=headers, data=data, verify=self.verify)
+    
+    def _refresh_oauth_token(self):
+        r = self._refresh_oauth_token_request()
+        token = r.json().get('access_token')
+        self.headers['Authorization'] = "Bearer " + token
+
+    @request_error_handler
+    def _get_oauth_token(base_url, client_id, client_secret, verify=False):
+        data = {
+            'grant_type': 'client_credentials'
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = '{base_url}/oauth2/token'.format(base_url=base_url)
+        return requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(client_id, client_secret), verify=verify)
+
+    @renew_access_token
+    @request_error_handler
+    def _get_request(self, url, **kwargs):
+        """ 
+        Do a get request on the provided URL
+        This is used by paginated endpoints
+        :rtype: requests.Response
+        """
+        params = {}
+        for k, v in kwargs.items():
+            if isinstance(v, list):
+                # Bakckend needs list parameters as a comma-separated list
+                str_values = [str(int) for int in v]
+                params[k] = ','.join(str_values)
+            else:
+                params[k] = v
+        
+        # TODO wait on engineering solve of the wrong value of next
+        if "http://" in url: 
+            url = url.replace("http://", "https://")
+
+        return requests.get(url, headers=self.headers, params=params, verify=self.verify)
+
+    def get_all_detections(self, **kwargs):
+        """
+        Generator to retrieve all detections - all parameters are optional
+        :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
+        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param category: detection category - will be removed with deprecation of v1 of api
+        :param certainty: certainty score (int)
+        :param certainty_gte: certainty score greater than or equal to (int)
+        :param detection: detection type
+        :param detection_type: detection type
+        :param detection_category: detection category
+        :param description:
+        :param fields: comma separated string of fields to be filtered and returned
+            possible values are: id, url, detection_url, category, detection, detection_category, 
+            detection_type, custom_detection, description, src_ip, state, t_score, c_score,
+            certainty, threat, first_timestamp, last_timestamp, targets_key_asset, 
+            is_targeting_key_asset, src_account, src_host, note, note_modified_by, 
+            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
+            assigned_date, groups, is_marked_custom, is_custom_model
+        :param host_id: detection id (int)
+        :param is_targeting_key_asset: detection is targeting key asset (bool)
+        :param is_triaged: detection is triaged
+        :param last_timestamp: timestamp of last activity on detection (datetime)
+        :param max_id: maximum ID of detection returned
+        :param min_id: minimum ID of detection returned
+        :param ordering: field used to sort response
+        :param page: page number to return (int)
+        :param page_size: number of object to return in repsonse (int)
+        :param src_ip: source ip address of host attributed to detection
+        :param state: state of detection (active/inactive)
+        :param t_score: threat score (int) - will be removed with deprecation of v1 of api
+        :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param tags: tags assigned to detection; this uses substring matching
+        :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
+        :param threat: threat score (int)
+        :param threat_gte threat score is greater than or equal to (int)
+        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
+        """
+        resp = self._get_request(url='{url}/detections'.format(url=self.url), **self._generate_detection_params(kwargs))
+        yield resp
+        while resp.json()['next']:
+            resp = self._get_request(url = resp.json()['next'])
+            yield resp
+
+    @renew_access_token
+    @request_error_handler
+    def get_detection_by_id(self, detection_id=None, **kwargs):
+        """
+        Get detection by id
+        :param detection_id: detection id - required
+        :param fields: comma separated string of fields to be filtered and returned - optional
+            possible values are: id, url, detection_url, category, detection, detection_category, 
+            detection_type, custom_detection, description, src_ip, state, t_score, c_score,
+            certainty, threat, first_timestamp, last_timestamp, targets_key_asset, 
+            is_targeting_key_asset, src_account, src_host, note, note_modified_by, 
+            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
+            assigned_date, groups, is_marked_custom, is_custom_model
+        """
+        if not detection_id:
+            raise ValueError('Detection id required')
+
+        return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+                                params=self._generate_detection_params(kwargs), verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def mark_detections_fixed(self, detection_ids=None):
+        """
+        Mark detections as fixed
+        :param detection_ids: list of detections to mark as fixed
+        """
+        if not isinstance(detection_ids, list):
+            raise ValueError('Must provide a list of detection IDs to mark as fixed')
+        
+        payload = {
+            'detectionIdList': detection_ids, 
+            'mark_as_fixed': "True"
+            }
+
+        return requests.patch('{url}/detections'.format(url=self.url), json=payload, headers=self.headers,
+                             verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def unmark_detections_fixed(self, detection_ids=None):
+        """
+        Unmark detections as fixed
+        :param detection_ids: list of detections to unmark as fixed
+        """
+        if not isinstance(detection_ids, list):
+            raise ValueError('Must provide a list of detection IDs to unmark as fixed')
+            
+        payload = {
+            'detectionIdList': detection_ids, 
+            'mark_as_fixed': "False"
+            }
+            
+        return requests.patch('{url}/detections'.format(url=self.url), json=payload, headers=self.headers,
+                             verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def mark_detections_custom(self, detection_ids=[], triage_category=None):
+        """
+        Mark detections as custom
+        :param detection_ids: list of detection IDs to mark as custom
+        :param triage_category: custom name to give detection
+        :rtype: requests.Response
+        """
+        if not isinstance(detection_ids, list):
+            raise ValueError('Must provide a list of detection IDs to mark as custom')
+
+        payload = {
+            "triage_category": triage_category,
+            "detectionIdList": detection_ids
+        }
+
+        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+                             verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def unmark_detections_custom(self, detection_ids=[]):
+        """
+        Unmark detection as custom
+        :param detection_ids: list of detection IDs to unmark as custom
+        :rtype: requests.Response
+        """
+        if not isinstance(detection_ids, list):
+            raise ValueError('Must provide a list of detection IDs to unmark as custom')
+
+        payload = {
+            "detectionIdList": detection_ids
+        }
+
+        response = requests.delete('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+                             verify=self.verify)
+
+        # DELETE returns an empty response, but we populate the response for consistency with the mark_as_fixed() function
+        json_dict = {'_meta': {'message': 'Successfully unmarked detections', 'level': 'Success'}}
+        response._content = json.dumps(json_dict).encode('utf-8')
+
+        return response
+
+    @renew_access_token
+    @request_error_handler
+    def get_detection_tags(self, detection_id=None):
+        """
+        Get detection tags
+        :param detection_id:
+        """
+        return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+                            verify=False)
+
+    @renew_access_token
+    @request_error_handler
+    def set_detection_tags(self, detection_id=None, tags=[], append=False):
+        """
+        Set  detection tags
+        :param detection_id:
+        :param tags: list of tags to add to detection
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True
+        Set to empty list to clear all tags (default: False)
+        """
+        if append and type(tags) == list:
+            current_list = self.get_detection_tags(detection_id=detection_id).json()['tags']
+            payload = {
+                "tags": current_list + tags
+            }
+        elif type(tags) == list:
+            payload = {
+                "tags": tags
+            }
+        else:
+            raise TypeError('tags must be of type list')
+
+        return requests.patch('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+                              json=payload, verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def bulk_set_detections_tag(self, tag, detection_ids):
+        """
+        Set a tag in bulk on multiple detections. Only one tag can be set at a time
+        :param detection_ids: IDs of the detections for which to set the tag
+        """
+        if not isinstance(detection_ids, list):
+            raise TypeError('Detection IDs must be of type list')
+
+        payload = {
+            'objectIds': detection_ids,
+            'tag': tag
+        }
+        return requests.post('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
+                            verify=False)
+
+    @renew_access_token
+    @request_error_handler
+    def bulk_delete_detections_tag(self, tag, detection_ids):
+        """
+        Delete a tag in bulk on multiple detections. Only one tag can be deleted at a time
+        :param detection_ids: IDs of the detections for which to delete the tag
+        """
+        if not isinstance(detection_ids, list):
+            raise TypeError('Detection IDs must be of type list')
+
+        payload = {
+            'objectIds': detection_ids,
+            'tag': tag
+        }
+        return requests.delete('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
+                            verify=False)
+
+    @renew_access_token
+    @request_error_handler
+    def get_detection_note(self, detection_id=None):
+        """
+        Get detection notes
+        :param detection_id: detection ID
+        """
+        if not detection_id:
+            raise ValueError('detection id required')
+
+        return requests.get('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def set_detection_note(self, detection_id=None, note=''):
+        """
+        Set detection note
+        :param detection_id: detection ID
+        :param note: content of the note to set
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.post('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, json=payload,
+            verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def update_detection_note(self, detection_id=None, note_id=None, note=''):
+        """
+        Set detection note
+        :param detection_id: detection ID
+        :param note_id: ID of the note to update
+        :param note: updated content of the note
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.patch('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
+            headers=self.headers, json=payload, verify=self.verify)
+    
+    @renew_access_token
+    @request_error_handler
+    def delete_detection_note(self, detection_id=None, note_id=None):
+        """
+        Set detection note
+        :param detection_id: detection ID
+        :param note_id: ID of the note to delete
+        """
+        return requests.delete('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
+            headers=self.headers, verify=self.verify)
+
+    def get_all_accounts(self, **kwargs):
+        """
+        Generator to retrieve all accounts - all parameters are optional
+        :param all: does nothing 
+        :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
+        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param certainty: certainty score (int)
+        :param certainty_gte: certainty score greater than or equal to (int)
+        :param fields: comma separated string of fields to be filtered and returned
+            possible values are id, url, name, state, threat, certainty, severity, account_type, 
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
+            last_detection_timestamp, detection_set, probable_home
+        :param first_seen: first seen timestamp of the account (datetime)
+        :param include_detection_summaries: include detection summary in response (bool)
+        :param last_seen: last seen timestamp of the account (datetime)
+        :param last_source: registered ip address of host
+        :param max_id: maximum ID of account returned
+        :param min_id: minimum ID of account returned
+        :param name: registered name of host
+        :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
+        :param ordering: field to use to order response
+        :param page: page number to return (int)
+        :param page_size: number of object to return in repsonse (int)
+        :param privilege_category: privilege category of account (low/medium/high)
+        :param privilege_level: privilege level of account (0-10)
+        :param privilege_level_gte: privilege of account level greater than or equal to (int)
+        :param state: state of host (active/inactive)
+        :param t_score: threat score (int) - will be removed with deprecation of v1 of api
+        :param t_score_gte: threat score greater than or equal to (int) - will be removed with deprection of v1 of api
+        :param tags: tags assigned to account
+        :param threat: threat score (int)
+        :param threat_gte: threat score greater than or equal to (int)
+        """
+        resp = self._get_request(url='{url}/accounts'.format(url=self.url), **self._generate_account_params(kwargs))
+        yield resp
+        while resp.json()['next']:
+            resp = self._get_request(url=resp.json()['next'])
+            yield resp
+
+    @renew_access_token
+    @request_error_handler
+    def get_account_by_id(self, account_id=None, **kwargs):
+        """
+        Get account by id
+        :param account_id: account id - required
+        :param fields: comma separated string of fields to be filtered and returned - optional
+            possible values are id, url, name, state, threat, certainty, severity, account_type, 
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
+            last_detection_timestamp, detection_set, probable_home
+        """
+        if not account_id:
+            raise ValueError('Account id required')
+
+        return requests.get('{url}/accounts/{id}'.format(url=self.url, id=account_id), headers=self.headers,
+                                params=self._generate_account_params(kwargs), verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def get_account_tags(self, account_id=None):
+        """
+        Get Account tags
+        :param account_id: ID of the account for which to retrieve the tags
+        """
+        return requests.get('{url}/tagging/account/{id}'.format(url=self.url, id=account_id), headers=self.headers,
+                            verify=False)
+
+    @renew_access_token
+    @request_error_handler
+    def set_account_tags(self, account_id=None, tags=[], append=False):
+        """
+        Set account tags
+        :param account_id: ID of the account for which to set the tags
+        :param tags: list of tags to add to account
+        :param append: overwrites existing list if set to False, appends to existing tags if set to True
+        Set to empty list to clear tags (default: False)
+        """
+        if append and type(tags) == list:
+            current_list = self.get_account_tags(account_id=account_id).json()['tags']
+            payload = {
+                "tags": current_list + tags
+            }
+        elif type(tags) == list:
+            payload = {
+                "tags": tags
+            }
+        else:
+            raise TypeError('tags must be of type list')
+
+        headers = self.headers.copy()
+        headers.update({
+            'Content-Type': "application/json",
+            'Cache-Control': "no-cache"
+        })
+
+        return requests.patch('{url}/tagging/account/{id}'.format(url=self.url, id=account_id), headers=headers,
+                              json=payload, verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def bulk_set_accounts_tag(self, tag, account_ids):
+        """
+        Set a tag in bulk on multiple accounts. Only one tag can be set at a time
+        :param account_ids: IDs of the accounts for which to set the tag
+        """
+        if not isinstance(account_ids, list):
+            raise TypeError('account IDs must be of type list')
+
+        payload = {
+            'objectIds': account_ids,
+            'tag': tag
+        }
+        return requests.post('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
+                            verify=False)
+
+    @renew_access_token
+    @request_error_handler
+    def bulk_delete_accounts_tag(self, tag, account_ids):
+        """
+        Delete a tag in bulk on multiple accounts. Only one tag can be deleted at a time
+        :param account_ids: IDs of the accounts on which to delete the tag
+        """
+        if not isinstance(account_ids, list):
+            raise TypeError('account IDs must be of type list')
+
+        payload = {
+            'objectIds': account_ids,
+            'tag': tag
+        }
+        return requests.delete('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
+                            verify=False)
+
+    @renew_access_token
+    @request_error_handler
+    def get_account_note(self, account_id=None):
+        """
+        Get account notes
+        :param account_id: account ID
+        """
+        if not account_id:
+            raise ValueError('account id required')
+
+        return requests.get('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def set_account_note(self, account_id=None, note=''):
+        """
+        Set account note
+        :param account_id: account ID
+        :param note: content of the note to set
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.post('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, json=payload,
+            verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def update_account_note(self, account_id=None, note_id=None, note=''):
+        """
+        Set account note
+        :param account_id: account ID
+        :param note_id: ID of the note to update
+        :param note: updated content of the note
+        """
+        if isinstance(note, str):
+            payload = {
+                "note": note
+            }
+        else:
+            raise TypeError('Note must be of type str')
+
+        return requests.patch('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
+            headers=self.headers, json=payload, verify=self.verify)
+    
+    @renew_access_token
+    @request_error_handler
+    def delete_account_note(self, account_id=None, note_id=None):
+        """
+        Set account note
+        :param account_id: account ID
+        :param note_id: ID of the note to delete
+        """
+
+        return requests.delete('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
+            headers=self.headers, verify=self.verify)
+
+    def get_all_rules(self, **kwargs):
+        """
+        Generator to retrieve all rules page by page - all parameters are optional
+        :param contains: search for rules containing this string (substring matching)
+        :param fields: comma separated string of fields to be filtered and returned
+            possible values are: active_detections, additional_conditions, created_timestamp,
+            description, detection, detection_category, enabled, id, is_whitelist, last_timestamp,
+            priority, source_conditions, template, total_detections, triage_category, url
+        :param include_templates: include rule templates, default is False
+        :param ordering: field used to sort response
+        :param page: page number to return (int)
+        :param page_size: number of object to return in repsonse (int)
+        """
+        resp = self._get_request(url='{url}/rules'.format(url=self.url), **self._generate_rule_params(kwargs))
+        yield resp
+        while resp.json()['next']:
+            resp = self._get_request(url = resp.json()['next'])
+            yield resp
+
+    @renew_access_token
+    @request_error_handler
+    def get_rule_by_id(self, rule_id, **kwargs):
+        """
+        Get triage rules by id
+        :param rule_id: id of triage rule to retrieve
+        :param fields: comma separated string of fields to be filtered and returned
+            possible values are: active_detections, additional_conditions, created_timestamp,
+            description, detection, detection_category, enabled, id, is_whitelist, last_timestamp,
+            priority, source_conditions, template, total_detections, triage_category, url
+        """
+        if not rule_id:
+            raise ValueError('Rule id required')
+
+        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers,
+                                params=self._generate_rule_by_id_params(kwargs), verify=False)
+
+    #TODO wait on fix
+    # CAUTION: this returns an error 500 altough the rule has been created succesfully\
+    # when source_conditions and/or additional_conditions are empty -  APP-11016
+    @renew_access_token
+    @request_error_handler
+    def create_rule(self, detection_category=None, detection_type=None, triage_category=None, 
+        source_conditions={'OR':[]}, additional_conditions=None, is_whitelist=False, **kwargs):
+        """
+        Create triage rule
+        :param detection_category: detection category to triage
+            possible values are: botnet activity, command & control, reconnaissance,
+            lateral movement, exfiltration
+        :param detection_type: detection type to triage
+        :param triage_category: name that will be used for triaged detection
+        :param source_conditions: JSON blobs to represent a tree-like conditional structure
+            operators for leaf nodes: ANY_OF or NONE_OF
+            operators for non-leaf nodes: AND or OR
+            possible value for conditions: ip, host, account, sensor
+            Here is an example of a payload:
+            "sourceConditions": {
+                "OR": [
+                {
+                    "AND": [
+                    {
+                        "ANY_OF": {
+                        "field": "ip",
+                        "values": [
+                            {
+                            "value": "10.45.91.184",
+                            "label": "10.45.91.184"
+                            }
+                        ],
+                        "groups": [],
+                        "label": "IP"
+                        }
+                    }
+                    ]
+                }
+                ]
+            }
+            }
+        :param additional_conditions: JSON blobs to represent a tree-like conditional structure
+            operators for leaf nodes: ANY_OF or NONE_OF
+            operators for non-leaf nodes: AND or OR
+            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port, 
+                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port, 
+                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share, 
+                file_extensions, rdp_client_name, rdp_client_token, keyboard_name
+            Here is an example of a payload:
+            "additionalConditions": {
+                "OR": [
+                {
+                    "AND": [
+                    {
+                        "ANY_OF": {
+                        "field": "remote1_ip",
+                        "values": [
+                            {
+                            "value": "10.1.52.71",
+                            "label": "10.1.52.71"
+                            }
+                        ],
+                        "groups": [],
+                        "label": "External Target IP"
+                        }
+                    }
+                    ]
+                }
+                ]
+            }
+        :param is_whitelist: set to True if rule is a whitelist, opposed to tracking detections without scores (boolean)
+        :param description: name of the triage rule - optional
+        :param priority: used to determine order of triage filters (int) - optional
+        :returns request object
+        """
+        if not all([detection_category, detection_type, triage_category]):
+            raise ValueError('Missing required parameter')
+        
+        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration']:
+            raise ValueError("detection_category not recognized")
+
+        payload = {
+            'detection_category': detection_category,
+            'detection': detection_type,
+            'triage_category': triage_category,
+            'is_whitelist': is_whitelist,
+            'source_conditions': source_conditions,
+            'additional_conditions': additional_conditions
+            }
+
+        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+                             verify=self.verify)
+
+    #TODO wait on fix
+    # CAUTION: this returns an error 500 altough the rule has been updated succesfully\
+    # when source_conditions and/or additional_conditions are empty -  APP-11016
+    # CAUTION2: API will error out if original rule has empty source or additional_conditions and\
+    # payload has non-empty conditions -  APP-11016
+    @renew_access_token
+    @request_error_handler
+    def update_rule(self, rule_id=None, **kwargs):
+        """
+        Update triage rule
+        :param rule_id: id of rule to update
+        :param triage_category: name that will be used for triaged detection
+        :param source_conditions: JSON blobs to represent a tree-like conditional structure
+            operators for leaf nodes: ANY_OF or NONE_OF
+            operators for non-leaf nodes: AND or OR
+            possible value for conditions: ip, host, account, sensor
+            Here is an example of a payload:
+            "sourceConditions": {
+                "OR": [
+                {
+                    "AND": [
+                    {
+                        "ANY_OF": {
+                        "field": "ip",
+                        "values": [
+                            {
+                            "value": "10.45.91.184",
+                            "label": "10.45.91.184"
+                            }
+                        ],
+                        "groups": [],
+                        "label": "IP"
+                        }
+                    }
+                    ]
+                }
+                ]
+            }
+            }
+        :param additional_conditions: JSON blobs to represent a tree-like conditional structure
+            operators for leaf nodes: ANY_OF or NONE_OF
+            operators for non-leaf nodes: AND or OR
+            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port, 
+                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port, 
+                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share, 
+                file_extensions, rdp_client_name, rdp_client_token, keyboard_name
+            Here is an example of a payload:
+            "additionalConditions": {
+                "OR": [
+                {
+                    "AND": [
+                    {
+                        "ANY_OF": {
+                        "field": "remote1_ip",
+                        "values": [
+                            {
+                            "value": "10.1.52.71",
+                            "label": "10.1.52.71"
+                            }
+                        ],
+                        "groups": [],
+                        "label": "External Target IP"
+                        }
+                    }
+                    ]
+                }
+                ]
+            }
+        :param is_whitelist: set to True if rule is a whitelist, opposed to tracking detections without scores (boolean)
+        :param description: name of the triage rule - optional
+        :param priority: used to determine order of triage filters (int) - optional
+        :param enabled: is the rule currently enables (boolean) - optional - Not yet implemented!
+        :returns request object
+        """
+
+        if rule_id:
+            rule = self.get_rule_by_id(rule_id=rule_id).json()
+        else:
+            raise ValueError("rule id must be provided")
+        
+        valid_keys = ['description', 'priority', 'enabled', 'triage_category', 
+            'is_whitelist', 'source_conditions', 'additional_conditions']
+
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                rule[k] = v
+            else:
+                raise ValueError('invalid parameter provided: {}'.format(str(k)))
+
+        return requests.put('{url}/rules/{id}'.format(url=self.url, id=rule['id']), headers=self.headers, json=rule,
+                            verify=self.verify)
+
+    @renew_access_token
+    @request_error_handler
+    def delete_rule(self, rule_id=None, restore_detections=True):
+        """
+        Delete triage rule
+        :param rule_id:
+        :param restore_detections: restore previously triaged detections (bool) default behavior is to restore
+        detections
+        """
+
+        if not rule_id:
+            raise ValueError('Rule id required')
+
+        params = {
+            'restore_detections': restore_detections
+        }
+
+        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
+                               verify=self.verify)
+
+    def bulk_delete_hosts_tag(self):
+        raise NotImplementedError
+
+    def bulk_set_hosts_tag(self):
+        raise NotImplementedError
+
+    def create_feed(self):
+        raise NotImplementedError
+
+    def create_group(self):
+        raise NotImplementedError
+
+    def delete_feed(self):
+        raise NotImplementedError
+
+    def delete_group(self):
+        raise NotImplementedError
+
+    def delete_host_note(self):
+        raise NotImplementedError
+
+    def delete_proxy(self):
+        raise NotImplementedError
+
+    def get_all_campaigns(self):
+        raise NotImplementedError
+
+    def get_all_groups(self):
+        raise NotImplementedError
+
+    def get_all_hosts(self):
+        raise NotImplementedError
+
+    def get_all_sensor_subnets(self):
+        raise NotImplementedError
+
+    def get_all_sensor_traffic_stats(self):
+        raise NotImplementedError
+
+    def get_all_subnets(self):
+        raise NotImplementedError
+
+    def get_all_traffic_stats(self):
+        raise NotImplementedError
+
+    def get_all_users(self):
+        raise NotImplementedError
+
+    def get_audits(self):
+        raise NotImplementedError
+
+    def get_campaign_by_id(self):
+        raise NotImplementedError
+
+    def get_campaigns(self):
+        raise NotImplementedError
+
+    def get_detect_usage(self):
+        raise NotImplementedError
+
+    def get_detection_pcap(self):
+        raise NotImplementedError
+
+    def get_feed_by_name(self):
+        raise NotImplementedError
+
+    def get_feeds(self):
+        raise NotImplementedError
+
+    def get_group_by_id(self):
+        raise NotImplementedError
+
+    def get_groups(self):
+        raise NotImplementedError
+
+    def get_groups_by_name(self):
+        raise NotImplementedError
+
+    def get_health_check(self):
+        raise NotImplementedError
+
+    def get_host_by_id(self):
+        raise NotImplementedError
+
+    def get_host_note(self):
+        raise NotImplementedError
+
+    def get_host_tags(self):
+        raise NotImplementedError
+
+    def get_hosts(self):
+        raise NotImplementedError
+
+    def get_internal_networks(self):
+        raise NotImplementedError
+
+    def get_ip_addresses(self):
+        raise NotImplementedError
+
+    def get_locked_accounts(self):
+        raise NotImplementedError
+
+    def get_proxies(self):
+        raise NotImplementedError
+
+    def get_proxy_by_id(self):
+        raise NotImplementedError
+
+    def get_user_by_id(self):
+        raise NotImplementedError
+
+    def post_stix_file(self):
+        raise NotImplementedError
+
+    def set_host_note(self):
+        raise NotImplementedError
+
+    def set_host_tags(self):
+        raise NotImplementedError
+
+    def set_internal_networks(self):
+        raise NotImplementedError
+
+    def set_key_asset(self):
+        raise NotImplementedError
+
+    def update_group(self):
+        raise NotImplementedError
+
+    def update_host_note(self):
+        raise NotImplementedError
+
+    def update_proxy(self):
+        raise NotImplementedError
+
+    def update_user(self):
+        raise NotImplementedError
