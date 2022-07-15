@@ -2145,7 +2145,7 @@ class VectraClientV2_1(VectraClient):
         if not all([detection_category, detection_type, triage_category]):
             raise ValueError('Missing required parameter')
         
-        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration']:
+        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration', 'info']:
             raise ValueError("detection_category not recognized")
 
         payload = {
