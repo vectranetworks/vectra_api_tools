@@ -1289,7 +1289,7 @@ class VectraClient(object):
         Get groups by id
         :param rule_id: id of group to retrieve
         """
-        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=False)
+        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
