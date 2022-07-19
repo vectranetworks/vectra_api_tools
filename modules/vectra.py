@@ -55,7 +55,7 @@ def request_error_handler(func):
 
 def validate_api_v2(func):
     def api_validator(self, *args, **kwargs):
-        if self.version == 2:
+        if self.version >= 2:
             return func(self, *args, **kwargs)
         else:
             raise NotImplementedError('Method only accessible via v2 of API')
@@ -1134,7 +1134,7 @@ class VectraClient(object):
         if not all([detection_category, detection_type, triage_category]):
             raise KeyError("missing required parameter: "
                              "detection_category, detection_type, triage_category")
-        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration']:
+        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration', 'info']:
             raise ValueError("detection_category not recognized")
 
         payload = {
@@ -1308,7 +1308,7 @@ class VectraClient(object):
         Get groups by id
         :param rule_id: id of group to retrieve
         """
-        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=False)
+        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
@@ -2385,7 +2385,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not detection_id:
             raise ValueError('detection id required')
 
-        return requests.get('{url}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+        return requests.get('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2506,15 +2506,16 @@ class VectraClientV3(VectraClientV2_2):
         :param verify: Verify SSL (default: False) - optional
         """
         # Remove potential trailing slash
-        url = VectraClientV3._remove_trailing_slashes(url)
+        url = self._remove_trailing_slashes(url)
         # Set endpoint to APIv3
         self.url = '{url}/api/v3'.format(url=url)
         self.base_url = url
+        self.version = 3
         self.verify = verify
         self.client_id = client_id
         self.client_secret = client_secret
         # Get the OAuth2 token
-        r_dict = VectraClientV3._get_oauth_token(url, client_id, client_secret).json()
+        r_dict = self._get_oauth_token(url, client_id, client_secret).json()
         access_token = r_dict.get('access_token')
         # Save the refresh token
         self.refresh_token = r_dict.get('refresh_token')
@@ -2538,10 +2539,29 @@ class VectraClientV3(VectraClientV2_2):
 
         for k, v in args.items():
             if k in valid_keys:
-                if v is not None: params[k] = v
+                if v is not None: 
+                    if isinstance(v, list):
+                        # Backend needs list parameters as a comma-separated list
+                        str_values = [str(int) for int in v]
+                        params[k] = ','.join(str_values)
+                    else:
+                        params[k] = v
             else:
                 raise ValueError('argument {} is an invalid assignment query parameter'.format(str(k)))
         return params
+
+    @staticmethod
+    @request_error_handler
+    def _get_oauth_token(base_url, client_id, client_secret, verify=False):
+        data = {
+            'grant_type': 'client_credentials'
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = '{base_url}/oauth2/token'.format(base_url=base_url)
+        return requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(client_id, client_secret), verify=verify)
 
     @request_error_handler
     def _refresh_oauth_token_request(self):
@@ -2561,18 +2581,6 @@ class VectraClientV3(VectraClientV2_2):
         token = r.json().get('access_token')
         self.headers['Authorization'] = "Bearer " + token
 
-    @request_error_handler
-    def _get_oauth_token(base_url, client_id, client_secret, verify=False):
-        data = {
-            'grant_type': 'client_credentials'
-            }
-        headers = {
-            'Content-Type': "application/x-www-form-urlencoded",
-            'Accept': "application/json"
-            }
-        url = '{base_url}/oauth2/token'.format(base_url=base_url)
-        return requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(client_id, client_secret), verify=verify)
-
     @renew_access_token
     @request_error_handler
     def _get_request(self, url, **kwargs):
@@ -2583,11 +2591,6 @@ class VectraClientV3(VectraClientV2_2):
         """
         params = {}
         for k, v in kwargs.items():
-            if isinstance(v, list):
-                # Bakckend needs list parameters as a comma-separated list
-                str_values = [str(int) for int in v]
-                params[k] = ','.join(str_values)
-            else:
                 params[k] = v
         
         # TODO wait on engineering solve of the wrong value of next
@@ -2697,7 +2700,6 @@ class VectraClientV3(VectraClientV2_2):
                              verify=self.verify)
 
     @renew_access_token
-    @request_error_handler
     def mark_detections_custom(self, detection_ids=[], triage_category=None):
         """
         Mark detections as custom
@@ -2705,53 +2707,26 @@ class VectraClientV3(VectraClientV2_2):
         :param triage_category: custom name to give detection
         :rtype: requests.Response
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError('Must provide a list of detection IDs to mark as custom')
-
-        payload = {
-            "triage_category": triage_category,
-            "detectionIdList": detection_ids
-        }
-
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
-                             verify=self.verify)
+        return super().mark_detections_custom(detection_ids, triage_category)
 
     @renew_access_token
-    @request_error_handler
     def unmark_detections_custom(self, detection_ids=[]):
         """
         Unmark detection as custom
         :param detection_ids: list of detection IDs to unmark as custom
         :rtype: requests.Response
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError('Must provide a list of detection IDs to unmark as custom')
-
-        payload = {
-            "detectionIdList": detection_ids
-        }
-
-        response = requests.delete('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
-                             verify=self.verify)
-
-        # DELETE returns an empty response, but we populate the response for consistency with the mark_as_fixed() function
-        json_dict = {'_meta': {'message': 'Successfully unmarked detections', 'level': 'Success'}}
-        response._content = json.dumps(json_dict).encode('utf-8')
-
-        return response
+        return super().unmark_detections_custom(detection_ids)
 
     @renew_access_token
-    @request_error_handler
     def get_detection_tags(self, detection_id=None):
         """
         Get detection tags
         :param detection_id:
         """
-        return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
-                            verify=False)
+        return super().get_detection_tags(detection_id)
 
     @renew_access_token
-    @request_error_handler
     def set_detection_tags(self, detection_id=None, tags=[], append=False):
         """
         Set  detection tags
@@ -2760,87 +2735,42 @@ class VectraClientV3(VectraClientV2_2):
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear all tags (default: False)
         """
-        if append and type(tags) == list:
-            current_list = self.get_detection_tags(detection_id=detection_id).json()['tags']
-            payload = {
-                "tags": current_list + tags
-            }
-        elif type(tags) == list:
-            payload = {
-                "tags": tags
-            }
-        else:
-            raise TypeError('tags must be of type list')
-
-        return requests.patch('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
-                              json=payload, verify=self.verify)
+        return super().set_detection_tags(detection_id, tags, append)
 
     @renew_access_token
-    @request_error_handler
     def bulk_set_detections_tag(self, tag, detection_ids):
         """
         Set a tag in bulk on multiple detections. Only one tag can be set at a time
         :param detection_ids: IDs of the detections for which to set the tag
         """
-        if not isinstance(detection_ids, list):
-            raise TypeError('Detection IDs must be of type list')
-
-        payload = {
-            'objectIds': detection_ids,
-            'tag': tag
-        }
-        return requests.post('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return super().bulk_set_detections_tag(tag, detection_ids)
 
     @renew_access_token
-    @request_error_handler
     def bulk_delete_detections_tag(self, tag, detection_ids):
         """
         Delete a tag in bulk on multiple detections. Only one tag can be deleted at a time
         :param detection_ids: IDs of the detections for which to delete the tag
         """
-        if not isinstance(detection_ids, list):
-            raise TypeError('Detection IDs must be of type list')
-
-        payload = {
-            'objectIds': detection_ids,
-            'tag': tag
-        }
-        return requests.delete('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return super().bulk_delete_detections_tag(tag, detection_ids)
 
     @renew_access_token
-    @request_error_handler
     def get_detection_note(self, detection_id=None):
         """
         Get detection notes
         :param detection_id: detection ID
         """
-        if not detection_id:
-            raise ValueError('detection id required')
-
-        return requests.get('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+        return super().get_detection_note(detection_id)
 
     @renew_access_token
-    @request_error_handler
     def set_detection_note(self, detection_id=None, note=''):
         """
         Set detection note
         :param detection_id: detection ID
         :param note: content of the note to set
         """
-        if isinstance(note, str):
-            payload = {
-                "note": note
-            }
-        else:
-            raise TypeError('Note must be of type str')
-
-        return requests.post('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, json=payload,
-            verify=self.verify)
+        return super().set_detection_note(detection_id, note)
 
     @renew_access_token
-    @request_error_handler
     def update_detection_note(self, detection_id=None, note_id=None, note=''):
         """
         Set detection note
@@ -2848,15 +2778,7 @@ class VectraClientV3(VectraClientV2_2):
         :param note_id: ID of the note to update
         :param note: updated content of the note
         """
-        if isinstance(note, str):
-            payload = {
-                "note": note
-            }
-        else:
-            raise TypeError('Note must be of type str')
-
-        return requests.patch('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
-            headers=self.headers, json=payload, verify=self.verify)
+        return super().update_detection_note(detection_id, note_id, note)
     
     @renew_access_token
     @request_error_handler
@@ -2866,8 +2788,7 @@ class VectraClientV3(VectraClientV2_2):
         :param detection_id: detection ID
         :param note_id: ID of the note to delete
         """
-        return requests.delete('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
-            headers=self.headers, verify=self.verify)
+        return super().delete_detection_note(detection_id, note_id)
 
     def get_all_accounts(self, **kwargs):
         """
@@ -2909,7 +2830,6 @@ class VectraClientV3(VectraClientV2_2):
             yield resp
 
     @renew_access_token
-    @request_error_handler
     def get_account_by_id(self, account_id=None, **kwargs):
         """
         Get account by id
@@ -2919,24 +2839,17 @@ class VectraClientV3(VectraClientV2_2):
             tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
             last_detection_timestamp, detection_set, probable_home
         """
-        if not account_id:
-            raise ValueError('Account id required')
-
-        return requests.get('{url}/accounts/{id}'.format(url=self.url, id=account_id), headers=self.headers,
-                                params=self._generate_account_params(kwargs), verify=self.verify)
+        return super().get_account_by_id(account_id, **kwargs)
 
     @renew_access_token
-    @request_error_handler
     def get_account_tags(self, account_id=None):
         """
         Get Account tags
         :param account_id: ID of the account for which to retrieve the tags
         """
-        return requests.get('{url}/tagging/account/{id}'.format(url=self.url, id=account_id), headers=self.headers,
-                            verify=False)
+        return super().get_account_tags(account_id)
 
     @renew_access_token
-    @request_error_handler
     def set_account_tags(self, account_id=None, tags=[], append=False):
         """
         Set account tags
@@ -2945,93 +2858,42 @@ class VectraClientV3(VectraClientV2_2):
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear tags (default: False)
         """
-        if append and type(tags) == list:
-            current_list = self.get_account_tags(account_id=account_id).json()['tags']
-            payload = {
-                "tags": current_list + tags
-            }
-        elif type(tags) == list:
-            payload = {
-                "tags": tags
-            }
-        else:
-            raise TypeError('tags must be of type list')
-
-        headers = self.headers.copy()
-        headers.update({
-            'Content-Type': "application/json",
-            'Cache-Control': "no-cache"
-        })
-
-        return requests.patch('{url}/tagging/account/{id}'.format(url=self.url, id=account_id), headers=headers,
-                              json=payload, verify=self.verify)
+        return super().set_account_tags(account_id, tags, append)
 
     @renew_access_token
-    @request_error_handler
     def bulk_set_accounts_tag(self, tag, account_ids):
         """
         Set a tag in bulk on multiple accounts. Only one tag can be set at a time
         :param account_ids: IDs of the accounts for which to set the tag
         """
-        if not isinstance(account_ids, list):
-            raise TypeError('account IDs must be of type list')
-
-        payload = {
-            'objectIds': account_ids,
-            'tag': tag
-        }
-        return requests.post('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return super().bulk_set_accounts_tag(tag, account_ids)
 
     @renew_access_token
-    @request_error_handler
     def bulk_delete_accounts_tag(self, tag, account_ids):
         """
         Delete a tag in bulk on multiple accounts. Only one tag can be deleted at a time
         :param account_ids: IDs of the accounts on which to delete the tag
         """
-        if not isinstance(account_ids, list):
-            raise TypeError('account IDs must be of type list')
-
-        payload = {
-            'objectIds': account_ids,
-            'tag': tag
-        }
-        return requests.delete('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return super().bulk_delete_accounts_tag(tag, account_ids)
 
     @renew_access_token
-    @request_error_handler
     def get_account_note(self, account_id=None):
         """
         Get account notes
         :param account_id: account ID
         """
-        if not account_id:
-            raise ValueError('account id required')
-
-        return requests.get('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, verify=self.verify)
+        return super().get_account_note(account_id)
 
     @renew_access_token
-    @request_error_handler
     def set_account_note(self, account_id=None, note=''):
         """
         Set account note
         :param account_id: account ID
         :param note: content of the note to set
         """
-        if isinstance(note, str):
-            payload = {
-                "note": note
-            }
-        else:
-            raise TypeError('Note must be of type str')
-
-        return requests.post('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, json=payload,
-            verify=self.verify)
+        return super().set_account_note(account_id, note)
 
     @renew_access_token
-    @request_error_handler
     def update_account_note(self, account_id=None, note_id=None, note=''):
         """
         Set account note
@@ -3039,18 +2901,9 @@ class VectraClientV3(VectraClientV2_2):
         :param note_id: ID of the note to update
         :param note: updated content of the note
         """
-        if isinstance(note, str):
-            payload = {
-                "note": note
-            }
-        else:
-            raise TypeError('Note must be of type str')
-
-        return requests.patch('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
-            headers=self.headers, json=payload, verify=self.verify)
+        return super().update_account_note(account_id, note_id, note)
     
     @renew_access_token
-    @request_error_handler
     def delete_account_note(self, account_id=None, note_id=None):
         """
         Set account note
@@ -3058,8 +2911,7 @@ class VectraClientV3(VectraClientV2_2):
         :param note_id: ID of the note to delete
         """
 
-        return requests.delete('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
-            headers=self.headers, verify=self.verify)
+        return super().delete_account_note(account_id, note_id)
 
     def get_all_rules(self, **kwargs):
         """
@@ -3081,7 +2933,6 @@ class VectraClientV3(VectraClientV2_2):
             yield resp
 
     @renew_access_token
-    @request_error_handler
     def get_rule_by_id(self, rule_id, **kwargs):
         """
         Get triage rules by id
@@ -3091,17 +2942,12 @@ class VectraClientV3(VectraClientV2_2):
             description, detection, detection_category, enabled, id, is_whitelist, last_timestamp,
             priority, source_conditions, template, total_detections, triage_category, url
         """
-        if not rule_id:
-            raise ValueError('Rule id required')
-
-        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers,
-                                params=self._generate_rule_by_id_params(kwargs), verify=False)
+        return super().get_rule_by_id(rule_id, **kwargs)
 
     #TODO wait on fix
     # CAUTION: this returns an error 500 altough the rule has been created succesfully\
     # when source_conditions and/or additional_conditions are empty -  APP-11016
     @renew_access_token
-    @request_error_handler
     def create_rule(self, detection_category=None, detection_type=None, triage_category=None, 
         source_conditions={'OR':[]}, additional_conditions=None, is_whitelist=False, **kwargs):
         """
@@ -3172,23 +3018,8 @@ class VectraClientV3(VectraClientV2_2):
         :param priority: used to determine order of triage filters (int) - optional
         :returns request object
         """
-        if not all([detection_category, detection_type, triage_category]):
-            raise ValueError('Missing required parameter')
-        
-        if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration']:
-            raise ValueError("detection_category not recognized")
-
-        payload = {
-            'detection_category': detection_category,
-            'detection': detection_type,
-            'triage_category': triage_category,
-            'is_whitelist': is_whitelist,
-            'source_conditions': source_conditions,
-            'additional_conditions': additional_conditions
-            }
-
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
-                             verify=self.verify)
+        return super().create_rule(detection_category, detection_type, triage_category, 
+            source_conditions, additional_conditions, is_whitelist, **kwargs)
 
     #TODO wait on fix
     # CAUTION: this returns an error 500 altough the rule has been updated succesfully\
@@ -3196,7 +3027,6 @@ class VectraClientV3(VectraClientV2_2):
     # CAUTION2: API will error out if original rule has empty source or additional_conditions and\
     # payload has non-empty conditions -  APP-11016
     @renew_access_token
-    @request_error_handler
     def update_rule(self, rule_id=None, **kwargs):
         """
         Update triage rule
@@ -3264,23 +3094,7 @@ class VectraClientV3(VectraClientV2_2):
         :param enabled: is the rule currently enables (boolean) - optional - Not yet implemented!
         :returns request object
         """
-
-        if rule_id:
-            rule = self.get_rule_by_id(rule_id=rule_id).json()
-        else:
-            raise ValueError("rule id must be provided")
-        
-        valid_keys = ['description', 'priority', 'enabled', 'triage_category', 
-            'is_whitelist', 'source_conditions', 'additional_conditions']
-
-        for k, v in kwargs.items():
-            if k in valid_keys:
-                rule[k] = v
-            else:
-                raise ValueError('invalid parameter provided: {}'.format(str(k)))
-
-        return requests.put('{url}/rules/{id}'.format(url=self.url, id=rule['id']), headers=self.headers, json=rule,
-                            verify=self.verify)
+        return super().update_rule(rule_id, **kwargs)
 
     @renew_access_token
     @request_error_handler
@@ -3291,16 +3105,7 @@ class VectraClientV3(VectraClientV2_2):
         :param restore_detections: restore previously triaged detections (bool) default behavior is to restore
         detections
         """
-
-        if not rule_id:
-            raise ValueError('Rule id required')
-
-        params = {
-            'restore_detections': restore_detections
-        }
-
-        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
-                               verify=self.verify)
+        return super().delete_rule(rule_id, restore_detections)
 
     def bulk_delete_hosts_tag(self):
         raise NotImplementedError
