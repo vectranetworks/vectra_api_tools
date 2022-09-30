@@ -2068,12 +2068,9 @@ class VectraClientV2_1(VectraClient):
             resp = self._get_request(url = resp.json()['next'])
             yield resp
 
-    #TODO wait on fix
-    # CAUTION: this returns an error 500 altough the rule has been created succesfully\
-    # when source_conditions and/or additional_conditions are empty -  APP-11016
     @request_error_handler
     def create_rule(self, detection_category=None, detection_type=None, triage_category=None, 
-        source_conditions={'OR':[]}, additional_conditions=None, is_whitelist=False, **kwargs):
+        source_conditions=None, additional_conditions=None, is_whitelist=False, **kwargs):
         """
         Create triage rule
         :param detection_category: detection category to triage
@@ -2160,11 +2157,6 @@ class VectraClientV2_1(VectraClient):
         return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
                              verify=self.verify)
 
-    #TODO wait on fix
-    # CAUTION: this returns an error 500 altough the rule has been updated succesfully\
-    # when source_conditions and/or additional_conditions are empty -  APP-11016
-    # CAUTION2: API will error out if original rule has empty source or additional_conditions and\
-    # payload has non-empty conditions -  APP-11016
     @request_error_handler
     def update_rule(self, rule_id=None, **kwargs):
         """
