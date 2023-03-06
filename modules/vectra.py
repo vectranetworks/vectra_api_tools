@@ -27,7 +27,7 @@ class HTTPException(Exception):
                 detail = response.content
         except Exception: 
             detail = response.content
-        body = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
+        body = f'Status code: {str(response.status_code)} - {detail}'
         super().__init__(body)
 
 
@@ -58,7 +58,7 @@ def deprecation(message):
 
 
 def param_deprecation(key):
-    message = '{0} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'.format(key)
+    message = f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'
     warnings.warn(message, PendingDeprecationWarning)
 
 
@@ -81,14 +81,14 @@ class VectraClient(object):
         url = VectraClient._remove_trailing_slashes(url)
 
         if token:
-            self.url = '{url}/api/v2'.format(url=url)
+            self.url = f'{url}/api/v2'
             self.headers = {
-                'Authorization': "Token " + token.strip(),
+                'Authorization': f"Token {token.strip()}",
                 'Content-Type': "application/json",
                 'Cache-Control': "no-cache"
             }
         elif user and password:
-            self.url = '{url}/api'.format(url=url)
+            self.url = f'{url}/api'
             self.auth = (user, password)
             deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
                         ' when possible')
@@ -115,7 +115,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid campaign query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
         return params
 
     @staticmethod
@@ -137,7 +137,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid host query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid host query parameter')
             if k in deprecated_keys: param_deprecation(k)
         return params
 
@@ -154,7 +154,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid host query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid host query parameter')
         return params
 
     @staticmethod
@@ -175,7 +175,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid detection query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid detection query parameter')
             if k in deprecated_keys: param_deprecation(k)
         return params
 
@@ -193,7 +193,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid group query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid group query parameter')
         return params
 
     @staticmethod
@@ -209,7 +209,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid rule query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid rule query parameter')
         return params
 
     @staticmethod
@@ -225,7 +225,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid rule query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid rule query parameter')
         return params
     
     @staticmethod
@@ -241,7 +241,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid user query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid user rule query parameter')
         return params
 
     @staticmethod
@@ -257,7 +257,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid ip address query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid ip address query parameter')
         return params
 
     @staticmethod
@@ -273,7 +273,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid subnet query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid subnet query parameter')
         return params
 
     @staticmethod
@@ -289,7 +289,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid internal network query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid internal network query parameter')
         return params
 
     @validate_api_v2
@@ -325,7 +325,7 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        return requests.get('{url}/campaigns'.format(url=self.url), headers=self.headers,
+        return requests.get(f'{self.url}/campaigns', headers=self.headers,
                                 params=self._generate_campaign_params(kwargs), verify=self.verify)
     
     def get_all_campaigns(self, **kwargs):
@@ -343,7 +343,7 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = requests.get('{url}/campaigns'.format(url=self.url), headers=self.headers,
+        resp = requests.get(f'{self.url}/campaigns', headers=self.headers,
                                 params=self._generate_campaign_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
@@ -359,7 +359,7 @@ class VectraClient(object):
         if not campaign_id:
             raise ValueError('Campaign id required')
 
-        return requests.get('{url}/campaigns/{id}'.format(url=self.url, id=campaign_id),
+        return requests.get(f'{self.url}/campaigns/{campaign_id}',
             headers=self.headers, verify=self.verify)
 
     @request_error_handler
@@ -407,10 +407,10 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
+            return requests.get(f'{self.url}/hosts', headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth,
+            return requests.get(f'{self.url}/hosts', auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
     def get_all_hosts(self, **kwargs):
@@ -455,7 +455,7 @@ class VectraClient(object):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        resp = requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
+        resp = requests.get(f'{self.url}/hosts', headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
@@ -483,10 +483,10 @@ class VectraClient(object):
             raise ValueError('Host id required')
 
         if self.version == 2:
-            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+            return requests.get(f'{self.url}/hosts/{host_id}', headers=self.headers,
                                 params=self._generate_host_by_id_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), auth=self.auth,
+            return requests.get(f'{self.url}/hosts/{host_id}', auth=self.auth,
                                 params=self._generate_host_by_id_params(kwargs), verify=self.verify)
 
     @validate_api_v2
@@ -506,7 +506,7 @@ class VectraClient(object):
         else:
             payload = {'key_asset':'false'}
 
-        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, json=payload,
+        return requests.patch(f'{self.url}/hosts/{host_id}', headers=self.headers, json=payload,
                               verify=self.verify)
 
     @validate_api_v2
@@ -519,7 +519,7 @@ class VectraClient(object):
         if not host_id:
             raise ValueError('Host id required')
 
-        return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+        return requests.get(f'{self.url}/tagging/host/{host_id}', headers=self.headers,
                             verify=False)
 
     @validate_api_v2
@@ -547,7 +547,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+        return requests.patch(f'{self.url}/tagging/host/{host_id}', headers=self.headers,
                               json=payload, verify=self.verify)
 
     @validate_api_v2
@@ -564,7 +564,7 @@ class VectraClient(object):
             'objectIds': host_ids,
             'tag': tag
         }
-        return requests.post('{url}/tagging/host'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/tagging/host', headers=self.headers, json=payload,
                             verify=False)
 
     @validate_api_v2
@@ -581,7 +581,7 @@ class VectraClient(object):
             'objectIds': host_ids,
             'tag': tag
         }
-        return requests.delete('{url}/tagging/host'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.delete(f'{self.url}/tagging/host', headers=self.headers, json=payload,
                             verify=False)
 
     @validate_api_v2
@@ -597,7 +597,7 @@ class VectraClient(object):
         if not host_id:
             raise ValueError('Host id required')
 
-        host = requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, verify=self.verify)
+        host = requests.get(f'{self.url}/hosts/{host_id}', headers=self.headers, verify=self.verify)
         if host.status_code == 200:
             host_note = host.json()['note']
             # API endpoint return HTML escaped characters
@@ -624,7 +624,7 @@ class VectraClient(object):
             if current_note:
                 if len(note) > 0:
                     payload = {
-                        "note": '{}{}{}'.format(current_note, '\n', note)
+                        "note": f'{current_note}\n{note}'
                     }
                 else:
                     payload = {
@@ -641,7 +641,7 @@ class VectraClient(object):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, data=json.dumps(payload),
+        return requests.patch(f'{self.url}/hosts/{host_id}', headers=self.headers, data=json.dumps(payload),
                                       verify=self.verify)
 
     @request_error_handler
@@ -685,10 +685,10 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
+            return requests.get(f'{self.url}/detections', headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth,
+            return requests.get(f'{self.url}/detections', auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
     def get_all_detections(self, **kwargs):
@@ -729,7 +729,7 @@ class VectraClient(object):
         :param threat_gte threat score is greater than or equal to (int)
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
-        resp = requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
+        resp = requests.get(f'{self.url}/detections', headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
@@ -753,10 +753,10 @@ class VectraClient(object):
             raise ValueError('Detection id required')
 
         if self.version == 2:
-            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+            return requests.get(f'{self.url}/detections/{detection_id}', headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), auth=self.auth,
+            return requests.get(f'{self.url}/detections/{detection_id}', auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
     @validate_api_v2
