@@ -790,7 +790,7 @@ class VectraClient(object):
             'mark_as_fixed': str(fixed)
             }
 
-        return requests.patch('{url}/detections'.format(url=self.url), json=payload, headers=self.headers,
+        return requests.patch(f'{self.url}/detections', json=payload, headers=self.headers,
                              verify=self.verify)
 
     @validate_api_v2
@@ -810,7 +810,7 @@ class VectraClient(object):
             "detectionIdList": detection_ids
         }
 
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/rules', headers=self.headers, json=payload,
                              verify=self.verify)
 
     @validate_api_v2
@@ -828,7 +828,7 @@ class VectraClient(object):
             "detectionIdList": detection_ids
         }
 
-        response = requests.delete('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+        response = requests.delete('f{self.url}/rules', headers=self.headers, json=payload,
                              verify=self.verify)
 
         # DELETE returns an empty response, but we populate the response for consistency with the mark_as_fixed() function
@@ -844,7 +844,7 @@ class VectraClient(object):
         Get detection tags
         :param detection_id:
         """
-        return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+        return requests.get(f'{self.url}/tagging/detection/{detection_id}', headers=self.headers,
                             verify=False)
 
     @validate_api_v2
@@ -869,7 +869,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        return requests.patch('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+        return requests.patch(f'{self.url}/tagging/detection/{detection_id}', headers=self.headers,
                               json=payload, verify=self.verify)
 
     @validate_api_v2
@@ -886,7 +886,7 @@ class VectraClient(object):
             'objectIds': detection_ids,
             'tag': tag
         }
-        return requests.post('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/tagging/detection', headers=self.headers, json=payload,
                             verify=False)
 
     @validate_api_v2
@@ -903,7 +903,7 @@ class VectraClient(object):
             'objectIds': detection_ids,
             'tag': tag
         }
-        return requests.delete('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.delete(f'{self.url}/tagging/detection', headers=self.headers, json=payload,
                             verify=False)
 
     @validate_api_v2
@@ -915,7 +915,7 @@ class VectraClient(object):
         For consistency we return a requests.models.Response object
         As we do not want to return the complete detection body, we alter the response content
         """
-        detection = requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+        detection = requests.get(f'{self.url}/detections/{detection_id}', headers=self.headers, verify=self.verify)
         if detection.status_code == 200:
             detection_note = detection.json()['note']
             # API endpoint return HTML escaped characters
@@ -939,7 +939,7 @@ class VectraClient(object):
             if current_note:
                 if len(note) > 0:
                     payload = {
-                        "note": '{}{}{}'.format(current_note, '\n', note)
+                        "note": f'{current_note}\n{note}'
                     }
                 else:
                     payload = {
@@ -956,7 +956,7 @@ class VectraClient(object):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.patch('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers, json=payload,
+        return requests.patch(f'{self.url}/detections/{detection_id}', headers=self.headers, json=payload,
             verify=self.verify)
 
     @validate_api_v2
@@ -966,7 +966,7 @@ class VectraClient(object):
         :param detection_id: ID of the detection for which to get a pcap
         :param filename: filename to write the pcap to. Will be overwriten if already exists.
         """
-        response = requests.get('{url}/detections/{id}/pcap'.format(url=self.url, id=detection_id), headers=self.headers,
+        response = requests.get(f'{self.url}/detections/{detection_id}/pcap', headers=self.headers,
                             verify=False)
         if response.status_code not in [200, 201, 204]:
             raise HTTPException(response)
