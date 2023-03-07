@@ -173,21 +173,23 @@ class VectraClient(object):
         return params
 
     @staticmethod
-    def _generate_detection_params(args):
+    def _generate_detection_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for detections based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
         valid_keys: set[str] = {'c_score_gte', 'certainty_gte', 'description', 'detection_category', 'detection_type', 'fields',
-                    'host_id', 'is_targeting_key_asset', 'is_triaged', 'last_timestamp', 'max_id', 'min_id',
-                    'note_modified_timestamp_gte', 'ordering', 'page', 'page_size', 'src_ip', 'state', 'tags',
-                    'threat_gte'}
-        deprecated_keys: set[str] = {'c_score', 'category', 'detection', 't_score', 'targets_key_asset'}
+                                'host_id', 'is_targeting_key_asset', 'is_triaged', 'last_timestamp', 'max_id', 'min_id',
+                                'note_modified_timestamp_gte', 'ordering', 'page', 'page_size', 'src_ip', 'state', 'tags',
+                                'threat_gte'}
+        deprecated_keys: set[str] = {
+            'c_score', 'category', 'detection', 't_score', 'targets_key_asset'}
         invalid_keys: set[str] = set(args) - valid_keys
 
         if invalid_keys:
-            raise ValueError(f"The following detection query parameters are invalid: {invalid_keys}")
+            raise ValueError(
+                f"The following detection query parameters are invalid: {invalid_keys}")
 
         for k in deprecated_keys & set(args):
             param_deprecation(k)
@@ -195,23 +197,19 @@ class VectraClient(object):
         return {k: v for k, v in args.items() if v is not None}
 
     @staticmethod
-    def _generate_group_params(args):
+    def _generate_group_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for groups based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['description', 'domains', 'host_ids', 'host_names', 'last_modified_by',
-                      'last_modified_timestamp', 'name', 'page', 'page_size', 'type']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid group query parameter')
-        return params
+        valid_keys: set[str] = {'description', 'domains', 'host_ids', 'host_names', 'last_modified_by',
+                                'last_modified_timestamp', 'name', 'page', 'page_size', 'type'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"The following group query parameters are invalid: {invalid_keys}")
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
     def _generate_rule_params(args):
