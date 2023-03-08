@@ -61,13 +61,13 @@ def validate_api_v2(func: Callable[..., requests.Response]) -> Callable[..., req
     return api_validator
 
 
-def deprecation(message) -> None:
+def deprecation(message: str) -> None:
     warnings.warn(message, PendingDeprecationWarning)
 
 
-def param_deprecation(key) -> None:
-    message = f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'
-    warnings.warn(message, PendingDeprecationWarning)
+def param_deprecation(key: str) -> None:
+    warnings.warn(
+        f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release', PendingDeprecationWarning)
 
 
 class VectraClient(object):
@@ -117,13 +117,11 @@ class VectraClient(object):
         """
         valid_keys: set[str] = {'fields', 'dst_ip', 'target_domain', 'state', 'name', 'last_updated_gte',
                                 'note_modified_timestamp_gte', 'page', 'page_size'}
-        params: dict[str, Any] = {
-            k: v for k, v in args.items() if k in valid_keys and v is not None}
         invalid_keys: set[str] = set(args.keys()) - valid_keys
         if invalid_keys:
             raise ValueError(
                 f'argument(s) {invalid_keys} is/are invalid campaign query parameter(s)')
-        return params
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
     def _generate_host_params(args: dict[str, Any]) -> dict[str, Any]:
@@ -145,16 +143,13 @@ class VectraClient(object):
             'c_score', 'c_score_gte', 'key_asset',
             't_score', 't_score_gte', 'targets_key_asset'
         }
-        params: dict[str, Any] = {
-            k: v for k, v in args.items() if k in valid_keys and v is not None
-        }
         invalid_keys: set[str] = set(args) - valid_keys
         if invalid_keys:
             raise ValueError(
                 f'Invalid host query parameter(s): {", ".join(invalid_keys)}')
         for k in deprecated_keys & set(args):
             param_deprecation(k)
-        return params
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
     def _generate_host_by_id_params(args: dict[str, Any]) -> dict[str, Any]:
@@ -164,13 +159,11 @@ class VectraClient(object):
         :rtype: dict
         """
         valid_keys: set[str] = {'fields', 'include_external', 'include_ldap'}
-        params: dict[str, Any] = {
-            k: v for k, v in args.items() if k in valid_keys and v is not None}
         invalid_keys: set[str] = set(args) - valid_keys
         if invalid_keys:
             raise ValueError(
                 f'Invalid host query parameter(s): {", ".join(invalid_keys)}')
-        return params
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
     def _generate_detection_params(args: dict[str, Any]) -> dict[str, Any]:
@@ -194,7 +187,7 @@ class VectraClient(object):
         for k in deprecated_keys & set(args):
             param_deprecation(k)
 
-        return {k: v for k, v in args.items() if v is not None}
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
     def _generate_group_params(args: dict[str, Any]) -> dict[str, Any]:
@@ -212,114 +205,90 @@ class VectraClient(object):
         return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
-    def _generate_rule_params(args):
+    def _generate_rule_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for rules based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['contains', 'fields', 'include_templates',
-                      'page', 'page_size', 'ordering']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid rule query parameter')
-        return params
+        valid_keys: set[str] = {'contains', 'fields', 'include_templates',
+                                'page', 'page_size', 'ordering'}
+        invalid_keys: set[str] = set(args.keys()) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid rule query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_rule_by_id_params(args):
+    def _generate_rule_by_id_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for rule based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['fields']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid rule query parameter')
-        return params
+        valid_keys: set[str] = {'fields'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid rule query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_user_params(args):
+    def _generate_user_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for users based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['username', 'role', 'account_type',
-                      'authentication_profile', 'last_login_gte']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid user rule query parameter')
-        return params
+        valid_keys: set[str] = {'username', 'role', 'account_type',
+                                'authentication_profile', 'last_login_gte'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid rule query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_ip_address_params(args):
+    def _generate_ip_address_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for ip address queries based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
         valid_keys = ['include_ipv4', 'include_ipv6']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid ip address query parameter')
-        return params
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid ip address query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_subnet_params(args):
+    def _generate_subnet_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for subnet queries based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['ordering', 'search']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid subnet query parameter')
-        return params
+        valid_keys = {'ordering', 'search'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid subnet query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_internal_network_params(args):
+    def _generate_internal_network_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for internal network queries based on provided argsbased on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['include_ipv4', 'include_ipv6']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None:
-                    params[k] = v
-            else:
-                raise ValueError(
-                    f'argument {str(k)} is an invalid internal network query parameter')
-        return params
+        valid_keys: set[str] = {'include_ipv4', 'include_ipv6'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid internal network query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @validate_api_v2
     @request_error_handler
