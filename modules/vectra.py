@@ -684,15 +684,19 @@ class VectraClient(object):
         :param threat_gte threat score is greater than or equal to (int)
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
-        resp: requests.Response = requests.get(f'{self.url}/detections', headers=self.headers,
-                                               params=self._generate_detection_params(kwargs), verify=self.verify)
-        yield resp
-        while resp.json()['next']:
-            resp = self._get_request(url=resp.json()['next'])
-            yield resp
+        url: str = f"{self.url}/detections"
+        params: dict[str, Any] = self._generate_detection_params(kwargs)
+        while url:
+            response: requests.Response = requests.get(
+                url, headers=self.headers, params=params, verify=self.verify)
+            response.raise_for_status()
+            yield response
+            data = response.json()
+            url = data["next"]
+            params = None  # Only include params for the first request
 
     @request_error_handler
-    def get_detection_by_id(self, detection_id=None, **kwargs):
+    def get_detection_by_id(self, detection_id: int, **kwargs) -> requests.Response:
         """
         Get detection by id
         :param detection_id: detection id - required
@@ -704,8 +708,6 @@ class VectraClient(object):
             note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
             assigned_date, groups, is_marked_custom, is_custom_model
         """
-        if not detection_id:
-            raise ValueError('Detection id required')
 
         if self.version == 2:
             return requests.get(f'{self.url}/detections/{detection_id}', headers=self.headers,
@@ -716,33 +718,27 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def mark_detections_fixed(self, detection_ids=None):
+    def mark_detections_fixed(self, detection_ids: list[int]) -> requests.Response:
         """
         Mark detections as fixed
         :param detection_ids: list of detections to mark as fixed
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError(
-                'Must provide a list of detection IDs to mark as fixed')
         return self._toggle_detections_fixed(detection_ids, fixed=True)
 
     @validate_api_v2
     @request_error_handler
-    def unmark_detections_fixed(self, detection_ids=None):
+    def unmark_detections_fixed(self, detection_ids: list[int]) -> requests.Response:
         """
         Unmark detections as fixed
         :param detection_ids: list of detections to unmark as fixed
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError(
-                'Must provide a list of detection IDs to unmark as fixed')
         return self._toggle_detections_fixed(detection_ids, fixed=False)
 
-    def _toggle_detections_fixed(self, detection_ids, fixed):
+    def _toggle_detections_fixed(self, detection_ids: list[int], fixed: bool) -> requests.Response:
         """
         Internal function to mark/unmark detections as fixed
         """
-        payload = {
+        payload: dict[str, Any] = {
             'detectionIdList': detection_ids,
             'mark_as_fixed': str(fixed)
         }
@@ -752,38 +748,29 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def mark_detections_custom(self, detection_ids=[], triage_category=None):
+    def mark_detections_custom(self, detection_ids: list[int], triage_category: str) -> requests.Response:
         """
         Mark detections as custom
         :param detection_ids: list of detection IDs to mark as custom
         :param triage_category: custom name to give detection
         :rtype: requests.Response
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError(
-                'Must provide a list of detection IDs to mark as custom')
-
         payload = {
             "triage_category": triage_category,
             "detectionIdList": detection_ids
         }
-
         return requests.post(f'{self.url}/rules', headers=self.headers, json=payload,
                              verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def unmark_detections_custom(self, detection_ids=[]):
+    def unmark_detections_custom(self, detection_ids: list[int]) -> requests.Response:
         """
         Unmark detection as custom
         :param detection_ids: list of detection IDs to unmark as custom
         :rtype: requests.Response
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError(
-                'Must provide a list of detection IDs to unmark as custom')
-
-        payload = {
+        payload: dict[str, list[int]] = {
             "detectionIdList": detection_ids
         }
 
