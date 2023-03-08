@@ -1,4 +1,5 @@
 import json
+from typing import Any, Callable, Dict, Generator, Literal, Optional
 import requests
 import warnings
 import html
@@ -9,13 +10,14 @@ import ipaddress
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
+
 class HTTPException(Exception):
-    def __init__(self, response):
+    def __init__(self, response: requests.Response) -> None:
         """ 
         Custom exception class to report possible API errors
         The body is contructed by extracting the API error code from the requests.Response object
         """
-        try: 
+        try:
             r = response.json()
             if 'detail' in r:
                 detail = r['detail']
@@ -25,16 +27,23 @@ class HTTPException(Exception):
                 detail = r['_meta']['message']
             else:
                 detail = response.content
-        except Exception: 
+        except Exception:
             detail = response.content
-        body = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
+        body: str = f'Status code: {str(response.status_code)} - {detail}'
         super().__init__(body)
 
 
-def request_error_handler(func):
-    def request_handler(self, *args, **kwargs):
+def request_error_handler(func: Callable[..., requests.Response]) -> Callable[..., requests.Response]:
+    """
+    A decorator that handles HTTP errors returned by a function that returns a `requests.Response` object.
+
+    Raises:
+        HTTPException: If the response status code is not in the 200, 201, or 204 range.
+    """
+
+    def request_handler(self: Any, *args: Any, **kwargs: Any) -> requests.Response:
         response = func(self, *args, **kwargs)
-        
+
         if response.status_code in [200, 201, 204]:
             return response
         else:
@@ -43,28 +52,27 @@ def request_error_handler(func):
     return request_handler
 
 
-def validate_api_v2(func):
-    def api_validator(self, *args, **kwargs):
+def validate_api_v2(func: Callable[..., requests.Response]) -> Callable[..., requests.Response]:
+    def api_validator(self: Any, *args: Any, **kwargs: Any) -> requests.Response:
         if self.version == 2:
             return func(self, *args, **kwargs)
         else:
-            raise NotImplementedError('Method only accessible via v2 of API')
-
+            raise ValueError('Method only accessible via v2 of API')
     return api_validator
 
 
-def deprecation(message):
+def deprecation(message: str) -> None:
     warnings.warn(message, PendingDeprecationWarning)
 
 
-def param_deprecation(key):
-    message = '{0} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'.format(key)
-    warnings.warn(message, PendingDeprecationWarning)
+def param_deprecation(key: str) -> None:
+    warnings.warn(
+        f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release', PendingDeprecationWarning)
 
 
 class VectraClient(object):
 
-    def __init__(self, url=None, token=None, user=None, password=None, verify=False):
+    def __init__(self, url: str, token: str | None, user: str | None, password: str | None, verify: bool = False) -> None:
         """
         Initialize Vectra client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
@@ -74,22 +82,22 @@ class VectraClient(object):
         :param verify: Verify SSL (default: False) - optional
         *Either token or user are required
         """
-        self.url = url
-        self.version = 2 if token else 1
-        self.verify = verify
+        self.url: str = url
+        self.version: Literal[2, 1] = 2 if token else 1
+        self.verify: bool = verify
 
-        url = VectraClient._remove_trailing_slashes(url)
+        url: str = VectraClient._remove_trailing_slashes(url)
 
         if token:
-            self.url = '{url}/api/v2'.format(url=url)
-            self.headers = {
-                'Authorization': "Token " + token.strip(),
+            self.url = f'{url}/api/v2'
+            self.headers: dict[str, str] = {
+                'Authorization': f"Token {token.strip()}",
                 'Content-Type': "application/json",
                 'Cache-Control': "no-cache"
             }
         elif user and password:
-            self.url = '{url}/api'.format(url=url)
-            self.auth = (user, password)
+            self.url = f'{url}/api'
+            self.auth: tuple[str, str] = (user, password)
             deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
                         ' when possible')
         else:
@@ -97,212 +105,201 @@ class VectraClient(object):
                                " and password")
 
     @staticmethod
-    def _remove_trailing_slashes(url):
-        url = url[:-1] if url.endswith('/') else url
-        return url
+    def _remove_trailing_slashes(url: str) -> str:
+        return url.rstrip('/')
 
     @staticmethod
-    def _generate_campaign_params(args):
+    def _generate_campaign_params(args: dict[str, Optional[Any]]) -> dict[str, Optional[Any]]:
         """
         Generate query parameters for campaigns based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['fields', 'dst_ip', 'target_domain', 'state', 'name', 'last_updated_gte',
-            'note_modified_timestamp_gte','page', 'page_size']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid campaign query parameter'.format(str(k)))
-        return params
+        valid_keys: set[str] = {'fields', 'dst_ip', 'target_domain', 'state', 'name', 'last_updated_gte',
+                                'note_modified_timestamp_gte', 'page', 'page_size'}
+        invalid_keys: set[str] = set(args.keys()) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f'argument(s) {invalid_keys} is/are invalid campaign query parameter(s)')
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
-    def _generate_host_params(args):
+    def _generate_host_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for hosts based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['active_traffic', 'all', 'c_score', 'c_score_gte', 'certainty', 'certainty_gte',
-            'fields', 'has_active_traffic', 'include_detection_summaries', 'is_key_asset', 'is_targeting_key_asset',
-            'key_asset', 'last_detection_timestamp', 'last_source', 'mac_address', 'max_id', 'min_id',
-            'name', 'note_modified_timestamp_gte', 'ordering','page', 'page_size', 'privilege_category',
-            'privilege_level', 'privilege_level_gte', 'state', 't_score', 't_score_gte', 'tags',
-            'targets_key_asset', 'threat', 'threat_gte']
-        deprecated_keys = ['c_score', 'c_score_gte', 'key_asset', 't_score', 't_score_gte', 'targets_key_asset']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid host query parameter'.format(str(k)))
-            if k in deprecated_keys: param_deprecation(k)
-        return params
+        valid_keys: set[str] = {
+            'active_traffic', 'all', 'certainty', 'certainty_gte',
+            'fields', 'has_active_traffic', 'include_detection_summaries',
+            'is_key_asset', 'is_targeting_key_asset', 'last_detection_timestamp',
+            'last_source', 'mac_address', 'max_id', 'min_id', 'name',
+            'note_modified_timestamp_gte', 'ordering', 'page', 'page_size',
+            'privilege_category', 'privilege_level', 'privilege_level_gte',
+            'state', 'tags', 'threat', 'threat_gte'
+        }
+        deprecated_keys: set[str] = {
+            'c_score', 'c_score_gte', 'key_asset',
+            't_score', 't_score_gte', 'targets_key_asset'
+        }
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f'Invalid host query parameter(s): {", ".join(invalid_keys)}')
+        for k in deprecated_keys & set(args):
+            param_deprecation(k)
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
-    def _generate_host_by_id_params(args):
+    def _generate_host_by_id_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for host based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['fields', 'include_external', 'include_ldap']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid host query parameter'.format(str(k)))
-        return params
+        valid_keys: set[str] = {'fields', 'include_external', 'include_ldap'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f'Invalid host query parameter(s): {", ".join(invalid_keys)}')
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
-    def _generate_detection_params(args):
+    def _generate_detection_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for detections based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['c_score', 'c_score_gte', 'category', 'certainty', 'certainty_gte', 'description',
-            'detection', 'detection_category', 'detection_type', 'fields', 'host_id', 'is_targeting_key_asset',
-            'is_triaged', 'last_timestamp', 'max_id', 'min_id', 'note_modified_timestamp_gte', 'ordering',
-            'page', 'page_size', 'src_ip', 'state', 't_score', 't_score_gte', 'tags', 'targets_key_asset',
-            'threat', 'threat_gte']
-        deprecated_keys = ['c_score', 'c_score_gte', 'category', 'detection', 't_score', 't_score_gte', 'targets_key_asset']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid detection query parameter'.format(str(k)))
-            if k in deprecated_keys: param_deprecation(k)
-        return params
+        valid_keys: set[str] = {'c_score_gte', 'certainty_gte', 'description', 'detection_category', 'detection_type', 'fields',
+                                'host_id', 'is_targeting_key_asset', 'is_triaged', 'last_timestamp', 'max_id', 'min_id',
+                                'note_modified_timestamp_gte', 'ordering', 'page', 'page_size', 'src_ip', 'state', 'tags',
+                                'threat_gte'}
+        deprecated_keys: set[str] = {
+            'c_score', 'category', 'detection', 't_score', 'targets_key_asset'}
+        invalid_keys: set[str] = set(args) - valid_keys
+
+        if invalid_keys:
+            raise ValueError(
+                f"The following detection query parameters are invalid: {invalid_keys}")
+
+        for k in deprecated_keys & set(args):
+            param_deprecation(k)
+
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
-    def _generate_group_params(args):
+    def _generate_group_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for groups based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['description', 'domains', 'host_ids', 'host_names', 'last_modified_by',
-            'last_modified_timestamp', 'name', 'page', 'page_size', 'type']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid group query parameter'.format(str(k)))
-        return params
+        valid_keys: set[str] = {'description', 'domains', 'host_ids', 'host_names', 'last_modified_by',
+                                'last_modified_timestamp', 'name', 'page', 'page_size', 'type'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"The following group query parameters are invalid: {invalid_keys}")
+        return {k: v for k, v in args.items() if k in valid_keys and v is not None}
 
     @staticmethod
-    def _generate_rule_params(args):
+    def _generate_rule_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for rules based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['contains', 'fields', 'include_templates', 'page', 'page_size', 'ordering']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid rule query parameter'.format(str(k)))
-        return params
+        valid_keys: set[str] = {'contains', 'fields', 'include_templates',
+                                'page', 'page_size', 'ordering'}
+        invalid_keys: set[str] = set(args.keys()) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid rule query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_rule_by_id_params(args):
+    def _generate_rule_by_id_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for rule based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['fields']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid rule query parameter'.format(str(k)))
-        return params
-    
+        valid_keys: set[str] = {'fields'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid rule query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
+
     @staticmethod
-    def _generate_user_params(args):
+    def _generate_user_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for users based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['username', 'role', 'account_type', 'authentication_profile', 'last_login_gte']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid user query parameter'.format(str(k)))
-        return params
+        valid_keys: set[str] = {'username', 'role', 'account_type',
+                                'authentication_profile', 'last_login_gte'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid rule query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_ip_address_params(args):
+    def _generate_ip_address_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for ip address queries based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
         valid_keys = ['include_ipv4', 'include_ipv6']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid ip address query parameter'.format(str(k)))
-        return params
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid ip address query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_subnet_params(args):
+    def _generate_subnet_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for subnet queries based on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['ordering', 'search']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid subnet query parameter'.format(str(k)))
-        return params
+        valid_keys = {'ordering', 'search'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid subnet query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @staticmethod
-    def _generate_internal_network_params(args):
+    def _generate_internal_network_params(args: dict[str, Any]) -> dict[str, Any]:
         """
         Generate query parameters for internal network queries based on provided argsbased on provided args
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {}
-        valid_keys = ['include_ipv4', 'include_ipv6']
-        for k, v in args.items():
-            if k in valid_keys:
-                if v is not None: params[k] = v
-            else:
-                raise ValueError('argument {} is an invalid internal network query parameter'.format(str(k)))
-        return params
+        valid_keys: set[str] = {'include_ipv4', 'include_ipv6'}
+        invalid_keys: set[str] = set(args) - valid_keys
+        if invalid_keys:
+            raise ValueError(
+                f"arguments {', '.join(invalid_keys)} are invalid internal network query parameters")
+        return {k: v for k, v in args.items() if v is not None and k in valid_keys}
 
     @validate_api_v2
     @request_error_handler
-    def _get_request(self, url, **kwargs):
+    def _get_request(self, url, **kwargs) -> requests.Response:
         """ 
         Do a get request on the provided URL
         This is used by paginated endpoints
         :rtype: requests.Response
         """
-        params = {}
-        for k, v in kwargs.items():
-            params[k] = v
+        params: dict[str.Any] = kwargs.copy(
+        )  # already shorter, but if no shallow copy is required we can just use kwargs and be done with it
         if self.version == 2:
             return requests.get(url, headers=self.headers, params=params, verify=self.verify)
         else:
@@ -310,7 +307,7 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def get_campaigns(self, **kwargs):
+    def get_campaigns(self, **kwargs) -> requests.Response:
         """
         Query all campaigns - all parameters are optional
         :param dst_ip: filter on campaign destination IP
@@ -325,10 +322,10 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        return requests.get('{url}/campaigns'.format(url=self.url), headers=self.headers,
-                                params=self._generate_campaign_params(kwargs), verify=self.verify)
-    
-    def get_all_campaigns(self, **kwargs):
+        return requests.get(f'{self.url}/campaigns', headers=self.headers,
+                            params=self._generate_campaign_params(kwargs), verify=self.verify)
+
+    def get_all_campaigns(self, **kwargs) -> Generator[requests.Response, None, None]:
         """
         Generator to retrieve all campaigns - all parameters are optional
         :param dst_ip: filter on campaign destination IP
@@ -343,27 +340,26 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = requests.get('{url}/campaigns'.format(url=self.url), headers=self.headers,
-                                params=self._generate_campaign_params(kwargs), verify=self.verify)
-        yield resp
-        while resp.json()['next']:
-            resp = self._get_request(url=resp.json()['next'])
+        url: str = f"{self.url}/campaigns"
+        params: dict[str, Any | None] = self._generate_campaign_params(kwargs)
+        while url:
+            resp: requests.Response = self._get_request(
+                url=url, headers=self.headers, params=params, verify=self.verify)
             yield resp
+            url = resp.json().get('next')
+            params = None  # Avoid unnecessary copying of query params on 2nd to last iteration
 
     @validate_api_v2
     @request_error_handler
-    def get_campaign_by_id(self, campaign_id=None, **kwargs):
+    def get_campaign_by_id(self, campaign_id) -> requests.Response:
         """
         Get campaign by id
         """
-        if not campaign_id:
-            raise ValueError('Campaign id required')
-
-        return requests.get('{url}/campaigns/{id}'.format(url=self.url, id=campaign_id),
-            headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/campaigns/{campaign_id}',
+                            headers=self.headers, verify=self.verify)
 
     @request_error_handler
-    def get_hosts(self, **kwargs):
+    def get_hosts(self, **kwargs) -> requests.Response:
         """
         Query all hosts - all parameters are optional
         :param all: if set to False, endpoint will only return hosts that have active detections, active traffic or are marked as key assets - default False
@@ -407,13 +403,13 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
+            return requests.get(f'{self.url}/hosts', headers=self.headers,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/hosts'.format(url=self.url), auth=self.auth,
+            return requests.get(f'{self.url}/hosts', auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
-    def get_all_hosts(self, **kwargs):
+    def get_all_hosts(self, **kwargs) -> Generator[requests.Response, None, None]:
         """
         Generator to retrieve all hosts - all parameters are optional
         :param all: if set to False, endpoint will only return hosts that have active detections, active traffic or are marked as key assets - default False
@@ -455,15 +451,17 @@ class VectraClient(object):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        resp = requests.get('{url}/hosts'.format(url=self.url), headers=self.headers,
-                                params=self._generate_host_params(kwargs), verify=self.verify)
-        yield resp
-        while resp.json()['next']:
-            resp = self._get_request(url=resp.json()['next'])
+        url: str = f"{self.url}/hosts"
+        params: dict[str, Any] = self._generate_host_params(kwargs)
+        while url:
+            resp: requests.Response = self._get_request(
+                url=url, headers=self.headers, params=params, verify=self.verify)
             yield resp
+            url = resp.json().get('next')
+            params = None  # Avoid unnecessary copying of query params
 
     @request_error_handler
-    def get_host_by_id(self, host_id=None, **kwargs):
+    def get_host_by_id(self, host_id, **kwargs) -> requests.Response:
         """
         Get host by id
         :param host_id: host id - required
@@ -479,52 +477,39 @@ class VectraClient(object):
             sensor_name, severity, shell_knocker, state, suspicious_admin_learnings, t_score, tags, targets_key_asset,
             threat, url, vcenter
         """
-        if not host_id:
-            raise ValueError('Host id required')
 
         if self.version == 2:
-            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+            return requests.get(f'{self.url}/hosts/{host_id}', headers=self.headers,
                                 params=self._generate_host_by_id_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), auth=self.auth,
+            return requests.get(f'{self.url}/hosts/{host_id}', auth=self.auth,
                                 params=self._generate_host_by_id_params(kwargs), verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def set_key_asset(self, host_id=None, set=True):
+    def set_key_asset(self, host_id, set=True) -> requests.Response:
         """
         (Un)set host as key asset
         :param host_id: id of host needing to be set - required
         :param set: set flag to true if setting host as key asset
         """
-
-        if not host_id:
-            raise ValueError('Host id required')
-
-        if set:
-            payload = {'key_asset':'true'}
-        else:
-            payload = {'key_asset':'false'}
-
-        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, json=payload,
+        payload: dict[str, str] = {'key_asset': 'true' if set else 'false'}
+        return requests.patch(f'{self.url}/hosts/{host_id}', headers=self.headers, json=payload,
                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def get_host_tags(self, host_id=None):
+    def get_host_tags(self, host_id) -> requests.Response:
         """
         Get host tags
         :param host_id: ID of the host for which to retrieve the tags
         """
-        if not host_id:
-            raise ValueError('Host id required')
-
-        return requests.get('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
-                            verify=False)
+        return requests.get(f'{self.url}/tagging/host/{host_id}', headers=self.headers,
+                            verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def set_host_tags(self, host_id=None, tags=[], append=False):
+    def set_host_tags(self, host_id: str, tags: list[str], append=False) -> requests.Response:
         """
         Set host tags
         :param host_id:
@@ -532,83 +517,71 @@ class VectraClient(object):
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear tags (default: False)
         """
-        if not host_id:
-            raise ValueError('Host id required')
-
-        if append and type(tags) == list:
-            current_list = self.get_host_tags(host_id=host_id).json()['tags']
-            payload = {
-                "tags": current_list + tags
-            }
-        elif type(tags) == list:
-            payload = {
-                "tags": tags
-            }
+        if append:
+            current_list = self.get_host_tags(host_id=host_id).json()[
+                'tags']  # TODO check type of tags
+            payload: dict[str, Any] = {"tags": current_list + tags}
         else:
-            raise TypeError('tags must be of type list')
+            payload = {"tags": tags}
 
-        return requests.patch('{url}/tagging/host/{id}'.format(url=self.url, id=host_id), headers=self.headers,
+        return requests.patch(f'{self.url}/tagging/host/{host_id}', headers=self.headers,
                               json=payload, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def bulk_set_hosts_tag(self, tag, host_ids):
+    def bulk_set_hosts_tag(self, tag: str, host_ids: list[str]) -> requests.Response:
         """
         Set a tag in bulk on multiple hosts. Only one tag can be set at a time
         :param host_ids: IDs of the hosts for which to set the tag
         """
-        if not isinstance(host_ids, list):
-            raise TypeError('Host IDs must be of type list')
-
-        payload = {
+        payload: dict[str, Any] = {
             'objectIds': host_ids,
             'tag': tag
         }
-        return requests.post('{url}/tagging/host'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return requests.post(f'{self.url}/tagging/host', headers=self.headers, json=payload,
+                             verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def bulk_delete_hosts_tag(self, tag, host_ids):
+    def bulk_delete_hosts_tag(self, tag: str, host_ids: list[str]) -> requests.Response:
         """
         Delete a tag in bulk on multiple hosts. Only one tag can be deleted at a time
         :param host_ids: IDs of the hosts on which to delete the tag
         """
-        if not isinstance(host_ids, list):
-            raise TypeError('Host IDs must be of type list')
-
-        payload = {
+        payload: dict[str, Any] = {
             'objectIds': host_ids,
             'tag': tag
         }
-        return requests.delete('{url}/tagging/host'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return requests.delete(f'{self.url}/tagging/host', headers=self.headers, json=payload,
+                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def get_host_note(self, host_id=None):
+    def get_host_note(self, host_id: str) -> requests.Response:
         """
         Get host notes
         :param host_id:
         For consistency we return a requests.models.Response object
         As we do not want to return the complete host body, we alter the response content
         """
-
-        if not host_id:
-            raise ValueError('Host id required')
-
-        host = requests.get('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, verify=self.verify)
-        if host.status_code == 200:
+        try:
+            host = requests.get(f'{self.url}/hosts/{host_id}',
+                                headers=self.headers, verify=self.verify)
             host_note = host.json()['note']
+
             # API endpoint return HTML escaped characters
-            host_note = html.unescape(host_note) if host_note else ''
-            json_dict = {'status': 'success', 'host_id': str(host_id), 'note': host_note}
+            host_note = json.loads(
+                host_note, object_hook=html.unescape) if host_note else ""
+            json_dict = {'status': 'success',
+                         'host_id': host_id, 'note': host_note}
             host._content = json.dumps(json_dict).encode('utf-8')
-        return host
+            return host
+        except:
+            raise ValueError(f'No host found for id {host_id}')
 
     @validate_api_v2
     @request_error_handler
-    def set_host_note(self, host_id=None, note='', append=False):
+    def set_host_note(self, host_id: str, note: str, append: bool = False) -> requests.Response:
         """
         Set host note
         :param host_id:
@@ -616,36 +589,18 @@ class VectraClient(object):
         :param append: overwrites existing note if set to False, appends if set to True
         Set to empty note string to clear host note
         """
-        if not host_id:
-            raise ValueError('Host id required')
-
-        if append and isinstance(note, str):
-            current_note = self.get_host_note(host_id=host_id).json()['note']
-            if current_note:
-                if len(note) > 0:
-                    payload = {
-                        "note": '{}{}{}'.format(current_note, '\n', note)
-                    }
-                else:
-                    payload = {
-                        "note": current_note
-                    }
-            else:
-                payload = {
-                    "note": note
-                }
-        elif isinstance(note, str):
-            payload = {
-                "note": note
-            }
+        if append:
+            current_note: str = self.get_host_note(
+                host_id=host_id).json()['note']
+            payload: dict[str, str] = {
+                "note": f"{current_note}\n{note}" if current_note else note}
         else:
-            raise TypeError('Note must be of type str')
-
-        return requests.patch('{url}/hosts/{id}'.format(url=self.url, id=host_id), headers=self.headers, data=json.dumps(payload),
-                                      verify=self.verify)
+            payload = {"note": note}
+        return requests.patch(f'{self.url}/hosts/{host_id}', headers=self.headers, data=json.dumps(payload),
+                              verify=self.verify)
 
     @request_error_handler
-    def get_detections(self, **kwargs):
+    def get_detections(self, **kwargs) -> requests.Response:
         """
         Query all detections - all parameters are optional
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
@@ -685,13 +640,13 @@ class VectraClient(object):
         """
 
         if self.version == 2:
-            return requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
+            return requests.get(f'{self.url}/detections', headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections'.format(url=self.url), auth=self.auth,
+            return requests.get(f'{self.url}/detections', auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
-    def get_all_detections(self, **kwargs):
+    def get_all_detections(self, **kwargs) -> Generator[requests.Response, None, None]:
         """
         Generator to retrieve all detections - all parameters are optional
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
@@ -729,15 +684,19 @@ class VectraClient(object):
         :param threat_gte threat score is greater than or equal to (int)
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
-        resp = requests.get('{url}/detections'.format(url=self.url), headers=self.headers,
-                                params=self._generate_detection_params(kwargs), verify=self.verify)
-        yield resp
-        while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
-            yield resp
+        url: str = f"{self.url}/detections"
+        params: dict[str, Any] = self._generate_detection_params(kwargs)
+        while url:
+            response: requests.Response = requests.get(
+                url, headers=self.headers, params=params, verify=self.verify)
+            response.raise_for_status()
+            yield response
+            data = response.json()
+            url = data["next"]
+            params = None  # Only include params for the first request
 
     @request_error_handler
-    def get_detection_by_id(self, detection_id=None, **kwargs):
+    def get_detection_by_id(self, detection_id: int, **kwargs) -> requests.Response:
         """
         Get detection by id
         :param detection_id: detection id - required
@@ -749,90 +708,78 @@ class VectraClient(object):
             note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
             assigned_date, groups, is_marked_custom, is_custom_model
         """
-        if not detection_id:
-            raise ValueError('Detection id required')
 
         if self.version == 2:
-            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+            return requests.get(f'{self.url}/detections/{detection_id}', headers=self.headers,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
         else:
-            return requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), auth=self.auth,
+            return requests.get(f'{self.url}/detections/{detection_id}', auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def mark_detections_fixed(self, detection_ids=None):
+    def mark_detections_fixed(self, detection_ids: list[int]) -> requests.Response:
         """
         Mark detections as fixed
         :param detection_ids: list of detections to mark as fixed
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError('Must provide a list of detection IDs to mark as fixed')
         return self._toggle_detections_fixed(detection_ids, fixed=True)
 
     @validate_api_v2
     @request_error_handler
-    def unmark_detections_fixed(self, detection_ids=None):
+    def unmark_detections_fixed(self, detection_ids: list[int]) -> requests.Response:
         """
         Unmark detections as fixed
         :param detection_ids: list of detections to unmark as fixed
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError('Must provide a list of detection IDs to unmark as fixed')
         return self._toggle_detections_fixed(detection_ids, fixed=False)
 
-    def _toggle_detections_fixed(self, detection_ids, fixed):
+    def _toggle_detections_fixed(self, detection_ids: list[int], fixed: bool) -> requests.Response:
         """
         Internal function to mark/unmark detections as fixed
         """
-        payload = {
-            'detectionIdList': detection_ids, 
+        payload: dict[str, Any] = {
+            'detectionIdList': detection_ids,
             'mark_as_fixed': str(fixed)
-            }
+        }
 
-        return requests.patch('{url}/detections'.format(url=self.url), json=payload, headers=self.headers,
-                             verify=self.verify)
+        return requests.patch(f'{self.url}/detections', json=payload, headers=self.headers,
+                              verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def mark_detections_custom(self, detection_ids=[], triage_category=None):
+    def mark_detections_custom(self, detection_ids: list[int], triage_category: str) -> requests.Response:
         """
         Mark detections as custom
         :param detection_ids: list of detection IDs to mark as custom
         :param triage_category: custom name to give detection
         :rtype: requests.Response
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError('Must provide a list of detection IDs to mark as custom')
-
         payload = {
             "triage_category": triage_category,
             "detectionIdList": detection_ids
         }
-
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/rules', headers=self.headers, json=payload,
                              verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def unmark_detections_custom(self, detection_ids=[]):
+    def unmark_detections_custom(self, detection_ids: list[int]) -> requests.Response:
         """
         Unmark detection as custom
         :param detection_ids: list of detection IDs to unmark as custom
         :rtype: requests.Response
         """
-        if not isinstance(detection_ids, list):
-            raise ValueError('Must provide a list of detection IDs to unmark as custom')
-
-        payload = {
+        payload: dict[str, list[int]] = {
             "detectionIdList": detection_ids
         }
 
-        response = requests.delete('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
-                             verify=self.verify)
+        response = requests.delete('f{self.url}/rules', headers=self.headers, json=payload,
+                                   verify=self.verify)
 
         # DELETE returns an empty response, but we populate the response for consistency with the mark_as_fixed() function
-        json_dict = {'_meta': {'message': 'Successfully unmarked detections', 'level': 'Success'}}
+        json_dict = {
+            '_meta': {'message': 'Successfully unmarked detections', 'level': 'Success'}}
         response._content = json.dumps(json_dict).encode('utf-8')
 
         return response
@@ -844,7 +791,7 @@ class VectraClient(object):
         Get detection tags
         :param detection_id:
         """
-        return requests.get('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+        return requests.get(f'{self.url}/tagging/detection/{detection_id}', headers=self.headers,
                             verify=False)
 
     @validate_api_v2
@@ -858,7 +805,8 @@ class VectraClient(object):
         Set to empty list to clear all tags (default: False)
         """
         if append and type(tags) == list:
-            current_list = self.get_detection_tags(detection_id=detection_id).json()['tags']
+            current_list = self.get_detection_tags(
+                detection_id=detection_id).json()['tags']
             payload = {
                 "tags": current_list + tags
             }
@@ -869,7 +817,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        return requests.patch('{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), headers=self.headers,
+        return requests.patch(f'{self.url}/tagging/detection/{detection_id}', headers=self.headers,
                               json=payload, verify=self.verify)
 
     @validate_api_v2
@@ -886,8 +834,8 @@ class VectraClient(object):
             'objectIds': detection_ids,
             'tag': tag
         }
-        return requests.post('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return requests.post(f'{self.url}/tagging/detection', headers=self.headers, json=payload,
+                             verify=False)
 
     @validate_api_v2
     @request_error_handler
@@ -903,8 +851,8 @@ class VectraClient(object):
             'objectIds': detection_ids,
             'tag': tag
         }
-        return requests.delete('{url}/tagging/detection'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return requests.delete(f'{self.url}/tagging/detection', headers=self.headers, json=payload,
+                               verify=False)
 
     @validate_api_v2
     @request_error_handler
@@ -915,12 +863,15 @@ class VectraClient(object):
         For consistency we return a requests.models.Response object
         As we do not want to return the complete detection body, we alter the response content
         """
-        detection = requests.get('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+        detection = requests.get(
+            f'{self.url}/detections/{detection_id}', headers=self.headers, verify=self.verify)
         if detection.status_code == 200:
             detection_note = detection.json()['note']
             # API endpoint return HTML escaped characters
-            detection_note = html.unescape(detection_note) if detection_note else ''
-            json_dict = {'status': 'success', 'detection_id': str(detection_id), 'note': detection_note}
+            detection_note = html.unescape(
+                detection_note) if detection_note else ''
+            json_dict = {'status': 'success', 'detection_id': str(
+                detection_id), 'note': detection_note}
             detection._content = json.dumps(json_dict).encode('utf-8')
         return detection
 
@@ -935,11 +886,12 @@ class VectraClient(object):
         Set to empty note string to clear detection note
         """
         if append and isinstance(note, str):
-            current_note = self.get_detection_note(detection_id=detection_id).json()['note']
+            current_note = self.get_detection_note(
+                detection_id=detection_id).json()['note']
             if current_note:
                 if len(note) > 0:
                     payload = {
-                        "note": '{}{}{}'.format(current_note, '\n', note)
+                        "note": f'{current_note}\n{note}'
                     }
                 else:
                     payload = {
@@ -956,8 +908,8 @@ class VectraClient(object):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.patch('{url}/detections/{id}'.format(url=self.url, id=detection_id), headers=self.headers, json=payload,
-            verify=self.verify)
+        return requests.patch(f'{self.url}/detections/{detection_id}', headers=self.headers, json=payload,
+                              verify=self.verify)
 
     @validate_api_v2
     def get_detection_pcap(self, detection_id=None, filename=None):
@@ -966,8 +918,8 @@ class VectraClient(object):
         :param detection_id: ID of the detection for which to get a pcap
         :param filename: filename to write the pcap to. Will be overwriten if already exists.
         """
-        response = requests.get('{url}/detections/{id}/pcap'.format(url=self.url, id=detection_id), headers=self.headers,
-                            verify=False)
+        response = requests.get(f'{self.url}/detections/{detection_id}/pcap', headers=self.headers,
+                                verify=False)
         if response.status_code not in [200, 201, 204]:
             raise HTTPException(response)
 
@@ -975,7 +927,8 @@ class VectraClient(object):
             f.write(response.content)
 
         # Return a <Response> object for consistency
-        json_dict = {'status': 'success', 'detection_id': str(detection_id), 'file_created': filename}
+        json_dict = {'status': 'success', 'detection_id': str(
+            detection_id), 'file_created': filename}
         response._content = json.dumps(json_dict).encode('utf-8')
         return response
 
@@ -999,15 +952,18 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
+        deprecation(
+            'Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
         if name:
-            deprecation('The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
+            deprecation(
+                'The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
             return self.get_rules_by_name(triage_category=name)
         elif rule_id:
-            deprecation('The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function')
+            deprecation(
+                'The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function')
             return self.get_rule_by_id(rule_id)
         else:
-            return requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
+            return requests.get(f'{self.url}/rules', headers=self.headers,
                                 params=self._generate_rule_params(kwargs), verify=self.verify)
 
     @validate_api_v2
@@ -1027,10 +983,11 @@ class VectraClient(object):
         if not rule_id:
             raise ValueError('Rule id required')
 
-        deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
+        deprecation(
+            'Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
 
-        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers,
-                                params=self._generate_rule_by_id_params(kwargs), verify=False)
+        return requests.get('f{self.url}/rules/{rule_id}', headers=self.headers,
+                            params=self._generate_rule_by_id_params(kwargs), verify=False)
 
     # TODO make return type requests.Reponse
     @validate_api_v2
@@ -1063,11 +1020,11 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                                params=self._generate_rule_params(kwargs), verify=self.verify)
+        resp = requests.get(f'{self.url}/rules', headers=self.headers,
+                            params=self._generate_rule_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -1114,7 +1071,7 @@ class VectraClient(object):
         """
         if not all([detection_category, detection_type, triage_category]):
             raise KeyError("missing required parameter: "
-                             "detection_category, detection_type, triage_category")
+                           "detection_category, detection_type, triage_category")
         if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration']:
             raise ValueError("detection_category not recognized")
 
@@ -1123,22 +1080,23 @@ class VectraClient(object):
             'detection': detection_type,
             'triage_category': triage_category,
             'is_whitelist': is_whitelist
-            }
+        }
 
         valid_keys = ['description', 'is_whitelist', 'ip', 'ip_group', 'host', 'host_group',
-            'sensor_luid', 'priority', 'all_hosts', 'remote1_ip', 'remote1_ip_groups',
-            'remote1_proto', 'remote1_port', 'remote1_dns', 'remote1_dns_groups', 'remote2_ip',
-            'remote2_ip_groups', 'remote2_proto', 'remote2_port', 'remote2_dns',
-            'remote2_dns_groups', 'account', 'named_pipe', 'uuid', 'identity', 'service',
-            'file_share', 'file_extensions', 'rdp_client_name', 'rdp_client_token', 'keyboard_name']
+                      'sensor_luid', 'priority', 'all_hosts', 'remote1_ip', 'remote1_ip_groups',
+                      'remote1_proto', 'remote1_port', 'remote1_dns', 'remote1_dns_groups', 'remote2_ip',
+                      'remote2_ip_groups', 'remote2_proto', 'remote2_port', 'remote2_dns',
+                      'remote2_dns_groups', 'account', 'named_pipe', 'uuid', 'identity', 'service',
+                      'file_share', 'file_extensions', 'rdp_client_name', 'rdp_client_token', 'keyboard_name']
 
         for k, v in kwargs.items():
             if k in valid_keys:
                 payload[k] = v
             else:
-                raise ValueError('argument {} is an invalid field for rule creation'.format(str(k)))
+                raise ValueError(
+                    f'argument {str(k)} is an invalid field for rule creation')
 
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/rules', headers=self.headers, json=payload,
                              verify=self.verify)
 
     @validate_api_v2
@@ -1184,7 +1142,8 @@ class VectraClient(object):
         """
 
         if name:
-            deprecation('The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
+            deprecation(
+                'The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
             matching_rules = self.get_rules_by_name(triage_category=name)
             if len(matching_rules) > 1:
                 raise Exception('More than one rule matching the name')
@@ -1197,13 +1156,12 @@ class VectraClient(object):
         else:
             raise ValueError("rule name or id must be provided")
 
-
         valid_keys = ['description', 'is_whitelist', 'ip', 'ip_group', 'host', 'host_group',
-            'sensor_luid', 'priority', 'all_hosts', 'remote1_ip', 'remote1_ip_groups',
-            'remote1_proto', 'remote1_port', 'remote1_dns', 'remote1_dns_groups', 'remote2_ip',
-            'remote2_ip_groups', 'remote2_proto', 'remote2_port', 'remote2_dns',
-            'remote2_dns_groups', 'account', 'named_pipe', 'uuid', 'identity', 'service',
-            'file_share', 'file_extensions', 'rdp_client_name', 'rdp_client_token', 'keyboard_name']
+                      'sensor_luid', 'priority', 'all_hosts', 'remote1_ip', 'remote1_ip_groups',
+                      'remote1_proto', 'remote1_port', 'remote1_dns', 'remote1_dns_groups', 'remote2_ip',
+                      'remote2_ip_groups', 'remote2_proto', 'remote2_port', 'remote2_dns',
+                      'remote2_dns_groups', 'account', 'named_pipe', 'uuid', 'identity', 'service',
+                      'file_share', 'file_extensions', 'rdp_client_name', 'rdp_client_token', 'keyboard_name']
 
         for k, v in kwargs.items():
             if k in valid_keys:
@@ -1215,9 +1173,9 @@ class VectraClient(object):
                 else:
                     rule[k] = v
             else:
-                raise ValueError('invalid parameter provided: {}'.format(str(k)))
+                raise ValueError(f'invalid parameter provided: {str(k)}')
 
-        return requests.put('{url}/rules/{id}'.format(url=self.url, id=rule['id']), headers=self.headers, json=rule,
+        return requests.put(f"{self.url}/rules/{rule['id']}", headers=self.headers, json=rule,
                             verify=self.verify)
 
     @validate_api_v2
@@ -1237,7 +1195,7 @@ class VectraClient(object):
             'restore_detections': restore_detections
         }
 
-        return requests.delete('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers, params=params,
+        return requests.delete('f{self.url}/rules/{rule_id}', headers=self.headers, params=params,
                                verify=self.verify)
 
     @validate_api_v2
@@ -1257,7 +1215,7 @@ class VectraClient(object):
         :param type: type of group to search (domain/host/ip)
         """
 
-        return requests.get('{url}/groups'.format(url=self.url), headers=self.headers,
+        return requests.get(f'{self.url}/groups', headers=self.headers,
                             params=self._generate_group_params(kwargs), verify=self.verify)
 
     @validate_api_v2
@@ -1275,11 +1233,11 @@ class VectraClient(object):
         :param page_size: number of object to return in repsonse (int)
         :param type: type of group to search (domain/host/ip)
         """
-        resp = requests.get('{url}/groups'.format(url=self.url), headers=self.headers,
+        resp = requests.get(f'{self.url}/groups', headers=self.headers,
                             params=self._generate_group_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -1289,7 +1247,7 @@ class VectraClient(object):
         Get groups by id
         :param rule_id: id of group to retrieve
         """
-        return requests.get('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/groups/{group_id}', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_groups_by_name(self, name=None, description=None):
@@ -1325,7 +1283,8 @@ class VectraClient(object):
         if not type:
             raise ValueError("missing required parameter: type")
         if type not in ['host', 'domain', 'ip']:
-            raise ValueError('parameter type must have value "domain", "ip" or "host"')
+            raise ValueError(
+                'parameter type must have value "domain", "ip" or "host"')
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
         if not isinstance(rules, list):
@@ -1341,10 +1300,10 @@ class VectraClient(object):
 
         for k, v in kwargs.items():
             if not type(v) == list:
-                raise TypeError("{} must be of type: list".format(k))
+                raise TypeError(f"{k} must be of type: list")
             payload[k] = v
 
-        return requests.post('{url}/groups'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/groups', headers=self.headers, json=payload,
                              verify=self.verify)
 
     @validate_api_v2
@@ -1362,11 +1321,11 @@ class VectraClient(object):
         """
         valid_keys = ['name', 'description', 'type', 'members', 'rules']
 
-        group = self.get_group_by_id(group_id = group_id).json()
+        group = self.get_group_by_id(group_id=group_id).json()
         try:
             id = group['id']
         except KeyError:
-            raise KeyError('Group with id {} was not found'.format(str(group_id)))
+            raise KeyError(f'Group with id {str(group_id)} was not found')
 
         # Transform members into flat list as API returns dicts for host groups
         if group['type'] == 'host':
@@ -1378,19 +1337,18 @@ class VectraClient(object):
         for k, v in kwargs.items():
             if k in valid_keys and v is not None:
                 if k in ['members', 'rules'] and not isinstance(v, list):
-                    raise TypeError('{} must be of type: list'.format(k))
+                    raise TypeError(f'{k} must be of type: list')
                 if append:
-                    group[k] +=  v
+                    group[k] += v
                 else:
                     group[k] = v
             else:
-                raise KeyError('Key {} is not valid'.format(k))
-
+                raise KeyError(f'Key {k} is not valid')
 
         group['members'] = list(set(group['members']))
 
-        return requests.patch('{url}/groups/{id}'.format(url=self.url, id=id), headers=self.headers, json=group,
-                            verify=self.verify)
+        return requests.patch(f'{self.url}/groups/{id}', headers=self.headers, json=group,
+                              verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1400,7 +1358,7 @@ class VectraClient(object):
         :param group_id:
         detections
         """
-        return requests.delete('{url}/groups/{id}'.format(url=self.url, id=group_id), headers=self.headers, verify=self.verify)
+        return requests.delete(f'{self.url}/groups/{group_id}', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_all_users(self, **kwargs):
@@ -1412,11 +1370,11 @@ class VectraClient(object):
         :param authentication_profile: filter by authentication profile
         :param last_login_gte: filter for users that have logged in since the given timestamp
         """
-        resp = requests.get('{url}/users'.format(url=self.url), headers=self.headers,
-                                params=self._generate_user_params(kwargs), verify=self.verify)
+        resp = requests.get(f'{self.url}/users', headers=self.headers,
+                            params=self._generate_user_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -1429,8 +1387,8 @@ class VectraClient(object):
         if not user_id:
             raise ValueError('User id required')
 
-        return requests.get('{url}/users/{id}'.format(url=self.url, id=user_id), headers=self.headers,
-                              verify=self.verify)
+        return requests.get(f'{self.url}/users/{user_id}', headers=self.headers,
+                            verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1443,7 +1401,7 @@ class VectraClient(object):
         """
         if not user_id:
             raise ValueError('User id required')
-        
+
         if not account_type in ['local', 'ldap', 'radius', 'tacacs']:
             raise ValueError('Invalid account_type provided')
 
@@ -1455,7 +1413,7 @@ class VectraClient(object):
             'authentication_profile': authentication_profile
         }
 
-        return requests.patch('{url}/users/{id}'.format(url=self.url, id=user_id), json=payload, headers=self.headers,
+        return requests.patch(f'{self.url}/users/{user_id}', json=payload, headers=self.headers,
                               verify=self.verify)
 
     @validate_api_v2
@@ -1465,10 +1423,11 @@ class VectraClient(object):
         Get all defined proxies
         """
         if proxy_id:
-            deprecation('The "proxy_id" argument will be removed from this function, please use the get_proxy_by_id() function')
+            deprecation(
+                'The "proxy_id" argument will be removed from this function, please use the get_proxy_by_id() function')
             return self.get_proxy_by_id(proxy_id=proxy_id)
         else:
-            return requests.get('{url}/proxies'.format(url=self.url), headers=self.headers, verify=self.verify)
+            return requests.get(f'{self.url}/proxies', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1480,8 +1439,8 @@ class VectraClient(object):
         if not proxy_id:
             raise ValueError('Proxy id required')
 
-        return requests.get('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
-                                verify=self.verify)
+        return requests.get(f'{self.url}/proxies/{proxy_id}', headers=self.headers,
+                            verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1498,7 +1457,7 @@ class VectraClient(object):
             }
         }
 
-        return requests.post('{url}/proxies'.format(url=self.url), json=payload, headers=self.headers, verify=self.verify)
+        return requests.post(f'{self.url}/proxies', json=payload, headers=self.headers, verify=self.verify)
 
     # TODO PATCH request modifies the proxy ID  and 404 is actually a 500 - APP-10753
     @validate_api_v2
@@ -1521,18 +1480,18 @@ class VectraClient(object):
         if enable is not None:
             payload["proxy"]["considerProxy"] = enable
 
-        return requests.patch('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), json=payload, headers=self.headers,
+        return requests.patch(f'{self.url}/proxies/{proxy_id}', json=payload, headers=self.headers,
                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def delete_proxy(self,proxy_id=None):
+    def delete_proxy(self, proxy_id=None):
         """ 
         Delete a proxy from the proxy list
         :param proxy_id: ID of the proxy to delete
         """
-        return requests.delete('{url}/proxies/{id}'.format(url=self.url, id=proxy_id), headers=self.headers,
-                              verify=self.verify)
+        return requests.delete(f'{self.url}/proxies/{proxy_id}', headers=self.headers,
+                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1548,13 +1507,13 @@ class VectraClient(object):
         :returns: request object
         """
         if not category in ['lateral', 'exfil', 'cnc']:
-            raise ValueError('Invalid category provided: {}'.format(category))
+            raise ValueError(f'Invalid category provided: {category}')
 
         if not certainty in ['Low', 'Medium', 'High']:
-            raise ValueError('Invalid certainty provided: {}'.format(str(certainty)))
+            raise ValueError(f'Invalid certainty provided: {str(certainty)}')
 
         if not itype in ['Anonymize', 'Exfiltration', 'Malware Artifacts', 'Watchlist', 'C2']:
-            raise ValueError('Invalid itype provided: {}'.format(str(itype)))
+            raise ValueError(f'Invalid itype provided: {str(itype)}')
 
         payload = {
             "threatFeed": {
@@ -1568,7 +1527,7 @@ class VectraClient(object):
             }
         }
 
-        return requests.post('{url}/threatFeeds'.format(url=self.url), json=payload, headers=self.headers,
+        return requests.post(f'{self.url}/threatFeeds', json=payload, headers=self.headers,
                              verify=self.verify)
 
     @validate_api_v2
@@ -1578,7 +1537,7 @@ class VectraClient(object):
         Deletes threat feed from Vectra
         :param feed_id: id of threat feed (returned by get_feed_by_name())
         """
-        return requests.delete('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id),
+        return requests.delete(f'{self.url}/threatFeeds/{feed_id}',
                                headers=self.headers, verify=self.verify)
 
     @validate_api_v2
@@ -1587,7 +1546,7 @@ class VectraClient(object):
         """
         Gets list of currently configured threat feeds
         """
-        return requests.get('{url}/threatFeeds'.format(url=self.url), headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/threatFeeds', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     def get_feed_by_name(self, name=None):
@@ -1596,7 +1555,8 @@ class VectraClient(object):
         :param name: name of threat feed
         """
         try:
-            response = requests.get('{url}/threatFeeds'.format(url=self.url), headers=self.headers, verify=self.verify)
+            response = requests.get(
+                f'{self.url}/threatFeeds', headers=self.headers, verify=self.verify)
         except requests.ConnectionError:
             raise Exception('Unable to connect to remote host')
 
@@ -1617,7 +1577,7 @@ class VectraClient(object):
         """
         headers = copy.deepcopy(self.headers)
         headers.pop('Content-Type', None)
-        return requests.post('{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=headers,
+        return requests.post(f'{self.url}/threatFeeds/{feed_id}', headers=headers,
                              files={'file': open(stix_file)}, verify=self.verify)
 
     @validate_api_v2
@@ -1630,7 +1590,8 @@ class VectraClient(object):
             https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide)
         """
         if stype not in ["hosts", "detections"]:
-            raise ValueError("Supported values for stype are hosts or detections")
+            raise ValueError(
+                "Supported values for stype are hosts or detections")
 
         if not query:
             raise ValueError('Query parameter is required')
@@ -1640,8 +1601,8 @@ class VectraClient(object):
             'query_string': query
         }
 
-        resp = requests.get('{url}/search/{stype}'.format(url=self.url, stype=stype), headers=self.headers,
-                                params=params, verify=self.verify)
+        resp = requests.get(f'{self.url}/search/{stype}', headers=self.headers,
+                            params=params, verify=self.verify)
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url=resp.json()['next'])
@@ -1652,10 +1613,11 @@ class VectraClient(object):
         """
         Generator to get all traffic stats
         """
-        resp = requests.get('{url}/traffic'.format(url=self.url), headers=self.headers, verify=self.verify)
+        resp = requests.get(f'{self.url}/traffic',
+                            headers=self.headers, verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -1667,10 +1629,11 @@ class VectraClient(object):
         if not sensor_luid:
             raise ValueError('Sensor LUID required')
 
-        resp = requests.get('{url}/traffic/{luid}'.format(url=self.url, luid=sensor_luid), headers=self.headers, verify=self.verify)
+        resp = requests.get(f'{self.url}/traffic/{sensor_luid}',
+                            headers=self.headers, verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -1681,11 +1644,11 @@ class VectraClient(object):
             possible values are: subnet, hosts, firstSeen, lastSeen
         :param search: only return subnets containing the search string
         """
-        resp = requests.get('{url}/subnets'.format(url=self.url), params=self._generate_subnet_params(kwargs),
-            headers=self.headers, verify=self.verify)
+        resp = requests.get(f'{self.url}/subnets', params=self._generate_subnet_params(kwargs),
+                            headers=self.headers, verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @validate_api_v2
@@ -1700,11 +1663,11 @@ class VectraClient(object):
         if not sensor_luid:
             raise ValueError('Sensor LUID required')
 
-        resp = requests.get('{url}/subnets/{luid}'.format(url=self.url, luid=sensor_luid), 
-            params=self._generate_subnet_params(kwargs), headers=self.headers, verify=self.verify)
+        resp = requests.get(f'{self.url}/subnets/{sensor_luid}',
+                            params=self._generate_subnet_params(kwargs), headers=self.headers, verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     # TODO see if the endpoint should become a generator
@@ -1717,8 +1680,8 @@ class VectraClient(object):
         :param include_ipv4: Include IPv4 addresses - default True
         :param include_ipv6: Include IPv6 addresses - default True
         """
-        return requests.get('{url}/ip_addresses'.format(url=self.url), params=self._generate_ip_address_params(kwargs),
-            headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/ip_addresses', params=self._generate_ip_address_params(kwargs),
+                            headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1726,8 +1689,8 @@ class VectraClient(object):
         """
         Get all internal networks configured on the brain
         """
-        return requests.get('{url}/settings/internal_network'.format(url=self.url),
-            headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/settings/internal_network',
+                            headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -1741,7 +1704,7 @@ class VectraClient(object):
         """
         # Check that all provided ranges are valid
         all(ipaddress.ip_network(i) for i in include+exclude+drop)
-        
+
         if append and all(isinstance(i, list) for i in [include, exclude, drop]):
             current_list = self.get_internal_networks().json()
             # We must make all entries unique
@@ -1759,8 +1722,8 @@ class VectraClient(object):
         else:
             raise TypeError('subnets must be of type list')
 
-        return requests.post('{url}/settings/internal_network'.format(url=self.url),
-            json=payload, headers=self.headers, verify=self.verify)
+        return requests.post(f'{self.url}/settings/internal_network',
+                             json=payload, headers=self.headers, verify=self.verify)
 
     # TODO see if check parameter has been fixed - APP-10753
     @request_error_handler
@@ -1771,12 +1734,12 @@ class VectraClient(object):
             possible values are: cpu, disk, hostid, memory, network, power, sensors, system
         """
         if not check:
-            return requests.get('{url}/health'.format(url=self.url), headers=self.headers, verify=self.verify)
+            return requests.get(f'{self.url}/health', headers=self.headers, verify=self.verify)
         else:
             if not isinstance(check, str):
                 raise ValueError('check need to be a string')
-            return requests.get('{url}/health/{check}'.format(url=self.url, check=check), headers=self.headers, verify=self.verify)
-        
+            return requests.get(f'{self.url}/health/{check}', headers=self.headers, verify=self.verify)
+
 
 class VectraClientV2_1(VectraClient):
 
@@ -1791,7 +1754,7 @@ class VectraClientV2_1(VectraClient):
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
-        self.url = '{url}/api/v2.1'.format(url=url)
+        self.url = f'{self.url}/api/v2.1'
 
     @staticmethod
     def _generate_account_params(args):
@@ -1802,16 +1765,18 @@ class VectraClientV2_1(VectraClient):
         """
         params = {}
         valid_keys = ['all', 'c_score', 'c_score_gte', 'certainty', 'certainty_gte', 'fields', 'first_seen',
-            'include_detection_summaries', 'last_seen', 'last_source', 'max_id', 'min_id', 'name',
-            'note_modified_timestamp_gte', 'ordering', 'page', 'page_size', 'privilege_category',
-            'privilege_level', 'privilege_level_gte', 'state', 't_score', 't_score_gte', 'tags',
-            'threat', 'threat_gte', 'uid']
+                      'include_detection_summaries', 'last_seen', 'last_source', 'max_id', 'min_id', 'name',
+                      'note_modified_timestamp_gte', 'ordering', 'page', 'page_size', 'privilege_category',
+                      'privilege_level', 'privilege_level_gte', 'state', 't_score', 't_score_gte', 'tags',
+                      'threat', 'threat_gte', 'uid']
 
         for k, v in args.items():
             if k in valid_keys:
-                if v is not None: params[k] = v
+                if v is not None:
+                    params[k] = v
             else:
-                raise ValueError('argument {} is an invalid account query parameter'.format(str(k)))
+                raise ValueError(
+                    f'argument {str(k)} is an invalid account query parameter')
         return params
 
     @staticmethod
@@ -1827,23 +1792,28 @@ class VectraClientV2_1(VectraClient):
         for k, v in args.items():
             if k in valid_keys:
                 if v is not None:
-                    # We validate the parameters here as the error thrown by the endpoint is not very verbose 
+                    # We validate the parameters here as the error thrown by the endpoint is not very verbose
                     if search.match(v):
                         params[k] = v
                     else:
-                        raise ValueError('{} is not a valid date string for detect usage query'.format(str(v)))
+                        raise ValueError(
+                            f'{str(v)} is not a valid date string for detect usage query')
             else:
-                raise ValueError('argument {} is an invalid detect usage query parameter'.format(str(k)))
+                raise ValueError(
+                    f'argument {str(k)} is an invalid detect usage query parameter')
         return params
 
     def get_campaigns(self, **kwargs):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_campaigns() which supports pagination')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_campaigns() which supports pagination')
 
     def get_hosts(self, **kwargs):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_hosts() which supports pagination')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_hosts() which supports pagination')
 
     def get_detections(self, **kwargs):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_detections() which supports pagination')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_detections() which supports pagination')
 
     def get_all_accounts(self, **kwargs):
         """
@@ -1878,8 +1848,8 @@ class VectraClientV2_1(VectraClient):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        resp = requests.get('{url}/accounts'.format(url=self.url), headers=self.headers,
-                                params=self._generate_account_params(kwargs), verify=self.verify)
+        resp = requests.get(f'{self.url}/accounts', headers=self.headers,
+                            params=self._generate_account_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url=resp.json()['next'])
@@ -1898,8 +1868,8 @@ class VectraClientV2_1(VectraClient):
         if not account_id:
             raise ValueError('Account id required')
 
-        return requests.get('{url}/accounts/{id}'.format(url=self.url, id=account_id), headers=self.headers,
-                                params=self._generate_account_params(kwargs), verify=self.verify)
+        return requests.get(f'{self.url}/accounts/{account_id}', headers=self.headers,
+                            params=self._generate_account_params(kwargs), verify=self.verify)
 
     @request_error_handler
     def get_account_tags(self, account_id=None):
@@ -1907,7 +1877,7 @@ class VectraClientV2_1(VectraClient):
         Get Account tags
         :param account_id: ID of the account for which to retrieve the tags
         """
-        return requests.get('{url}/tagging/account/{id}'.format(url=self.url, id=account_id), headers=self.headers,
+        return requests.get(f'{self.url}/tagging/account/{account_id}', headers=self.headers,
                             verify=False)
 
     @request_error_handler
@@ -1920,7 +1890,8 @@ class VectraClientV2_1(VectraClient):
         Set to empty list to clear tags (default: False)
         """
         if append and type(tags) == list:
-            current_list = self.get_account_tags(account_id=account_id).json()['tags']
+            current_list = self.get_account_tags(
+                account_id=account_id).json()['tags']
             payload = {
                 "tags": current_list + tags
             }
@@ -1937,7 +1908,7 @@ class VectraClientV2_1(VectraClient):
             'Cache-Control': "no-cache"
         })
 
-        return requests.patch('{url}/tagging/account/{id}'.format(url=self.url, id=account_id), headers=headers,
+        return requests.patch(f'{self.url}/tagging/account/{account_id}', headers=headers,
                               json=payload, verify=self.verify)
 
     @request_error_handler
@@ -1953,8 +1924,8 @@ class VectraClientV2_1(VectraClient):
             'objectIds': account_ids,
             'tag': tag
         }
-        return requests.post('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return requests.post(f'{self.url}/tagging/account', headers=self.headers, json=payload,
+                             verify=False)
 
     @request_error_handler
     def bulk_delete_accounts_tag(self, tag, account_ids):
@@ -1969,8 +1940,8 @@ class VectraClientV2_1(VectraClient):
             'objectIds': account_ids,
             'tag': tag
         }
-        return requests.delete('{url}/tagging/account'.format(url=self.url), headers=self.headers, json=payload,
-                            verify=False)
+        return requests.delete(f'{self.url}/tagging/account', headers=self.headers, json=payload,
+                               verify=False)
 
     @request_error_handler
     def get_account_note(self, account_id=None):
@@ -1980,28 +1951,32 @@ class VectraClientV2_1(VectraClient):
         For consistency we return a requests.models.Response object
         As we do not want to return the complete host body, we alter the response content
         """
-        account = requests.get('{url}/accounts/{id}'.format(url=self.url, id=account_id), headers=self.headers, verify=self.verify)
+        account = requests.get(
+            f'{self.url}/accounts/{account_id}', headers=self.headers, verify=self.verify)
         if account.status_code == 200:
             account_note = account.json()['note']
             # API endpoint return HTML escaped characters
             account_note = html.unescape(account_note) if account_note else ''
-            json_dict = {'status': 'success', 'account_id': str(account_id), 'note': account_note}
+            json_dict = {'status': 'success', 'account_id': str(
+                account_id), 'note': account_note}
             account._content = json.dumps(json_dict).encode('utf-8')
         return account
 
     # TODO check if PATCH endpoint has been implemented on accounts
     def set_account_note(self, account_id=None, note='', append=False):
-        raise NotImplementedError('The PATCH endpoint is not yet implemented on /accounts')
+        raise NotImplementedError(
+            'The PATCH endpoint is not yet implemented on /accounts')
 
     @request_error_handler
     def get_locked_accounts(self):
         """
         Get list of account locked by Account Lockdown
         """
-        return requests.get('{url}/lockdown/account'.format(url=self.url), headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/lockdown/account', headers=self.headers, verify=self.verify)
 
     def get_rules(self, **kwargs):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_rules() which supports pagination')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_rules() which supports pagination')
 
     def advanced_search(self, stype=None, page_size=50, query=None):
         """
@@ -2012,7 +1987,8 @@ class VectraClientV2_1(VectraClient):
             https://support.vectranetworks.com/hc/en-us/articles/360003225254-Search-Reference-Guide)
         """
         if stype not in ['hosts', 'detections', 'accounts']:
-            raise ValueError("Supported values for stype are hosts, detections or accounts")
+            raise ValueError(
+                "Supported values for stype are hosts, detections or accounts")
 
         if not query:
             raise ValueError('Query parameter is required')
@@ -2022,8 +1998,8 @@ class VectraClientV2_1(VectraClient):
             'query_string': query
         }
 
-        resp = requests.get('{url}/search/{stype}'.format(url=self.url, stype=stype), headers=self.headers,
-                                params=params, verify=self.verify)
+        resp = requests.get(f'{self.url}/search/{stype}', headers=self.headers,
+                            params=params, verify=self.verify)
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url=resp.json()['next'])
@@ -2042,11 +2018,12 @@ class VectraClientV2_1(VectraClient):
         if not rule_id:
             raise ValueError('Rule id required')
 
-        return requests.get('{url}/rules/{id}'.format(url=self.url, id=rule_id), headers=self.headers,
-                                params=self._generate_rule_by_id_params(kwargs), verify=False)
+        return requests.get(f'{self.url}/rules/{rule_id}', headers=self.headers,
+                            params=self._generate_rule_by_id_params(kwargs), verify=False)
 
     def get_rules_by_name(self, triage_category=None, description=None):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_rules with the "contains" query parameter')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_rules with the "contains" query parameter')
 
     def get_all_rules(self, **kwargs):
         """
@@ -2061,16 +2038,16 @@ class VectraClientV2_1(VectraClient):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = requests.get('{url}/rules'.format(url=self.url), headers=self.headers,
-                                params=self._generate_rule_params(kwargs), verify=self.verify)
+        resp = requests.get(f'{self.url}/rules', headers=self.headers,
+                            params=self._generate_rule_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
-            resp = self._get_request(url = resp.json()['next'])
+            resp = self._get_request(url=resp.json()['next'])
             yield resp
 
     @request_error_handler
-    def create_rule(self, detection_category=None, detection_type=None, triage_category=None, 
-        source_conditions=None, additional_conditions=None, is_whitelist=False, **kwargs):
+    def create_rule(self, detection_category=None, detection_type=None, triage_category=None,
+                    source_conditions=None, additional_conditions=None, is_whitelist=False, **kwargs):
         """
         Create triage rule
         :param detection_category: detection category to triage
@@ -2141,7 +2118,7 @@ class VectraClientV2_1(VectraClient):
         """
         if not all([detection_category, detection_type, triage_category]):
             raise ValueError('Missing required parameter')
-        
+
         if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration', 'info']:
             raise ValueError("detection_category not recognized")
 
@@ -2152,9 +2129,9 @@ class VectraClientV2_1(VectraClient):
             'is_whitelist': is_whitelist,
             'source_conditions': source_conditions,
             'additional_conditions': additional_conditions
-            }
+        }
 
-        return requests.post('{url}/rules'.format(url=self.url), headers=self.headers, json=payload,
+        return requests.post(f'{self.url}/rules', headers=self.headers, json=payload,
                              verify=self.verify)
 
     @request_error_handler
@@ -2230,24 +2207,26 @@ class VectraClientV2_1(VectraClient):
             rule = self.get_rule_by_id(rule_id=rule_id).json()
         else:
             raise ValueError("rule id must be provided")
-        
-        valid_keys = ['description', 'priority', 'enabled', 'triage_category', 
-            'is_whitelist', 'source_conditions', 'additional_conditions']
+
+        valid_keys = ['description', 'priority', 'enabled', 'triage_category',
+                      'is_whitelist', 'source_conditions', 'additional_conditions']
 
         for k, v in kwargs.items():
             if k in valid_keys:
                 rule[k] = v
             else:
-                raise ValueError('invalid parameter provided: {}'.format(str(k)))
+                raise ValueError(f'invalid parameter provided: {str(k)}')
 
-        return requests.put('{url}/rules/{id}'.format(url=self.url, id=rule['id']), headers=self.headers, json=rule,
+        return requests.put(f"{self.url}/rules/{rule['id']}", headers=self.headers, json=rule,
                             verify=self.verify)
 
     def get_groups(self, **kwargs):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_groups() which supports pagination')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_groups() which supports pagination')
 
     def get_groups_by_name(self, name=None, description=None):
-        raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_groups with the "description" query parameter')
+        raise DeprecationWarning(
+            'This function has been deprecated in the Vectra API client v2.1. Please use get_all_groups with the "description" query parameter')
 
     def get_detect_usage(self, **kwargs):
         """
@@ -2256,8 +2235,8 @@ class VectraClientV2_1(VectraClient):
         :param end: end month for the usage statistics - format YYYY-mm
         Default is statistics from last month
         """
-        return requests.get('{url}/usage/detect'.format(url=self.url), params=self._generate_detect_usage_params(kwargs), 
-            headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/usage/detect', params=self._generate_detect_usage_params(kwargs),
+                            headers=self.headers, verify=self.verify)
 
     @request_error_handler
     def get_audits(self, start_date=None, end_date=None):
@@ -2267,13 +2246,13 @@ class VectraClientV2_1(VectraClient):
         :param end_date: end date (datetime.date), GMT, defaults to date.max
         """
         if start_date is None and end_date is None:
-            return requests.get('{url}/audits'.format(url=self.url), headers=self.headers, verify=self.verify)
+            return requests.get(f'{self.url}/audits', headers=self.headers, verify=self.verify)
         elif start_date is None and end_date is not None:
-            return requests.get('{url}/audits?end={end}'.format(url=self.url, end=end_date.isoformat()), headers=self.headers, verify=self.verify)
+            return requests.get(f'{self.url}/audits?end={end_date.isoformat()}', headers=self.headers, verify=self.verify)
         elif start_date is not None and end_date is None:
-            return requests.get('{url}/audits?start={start}'.format(url=self.url, start=start_date.isoformat()), headers=self.headers, verify=self.verify)
+            return requests.get(f'{self.url}/audits?start={start_date.isoformat()}', headers=self.headers, verify=self.verify)
         else:
-            return requests.get('{url}/audits?start={start}&end={end}'.format(url=self.url, start=start_date.isoformat(), end=end_date.isoformat()), headers=self.headers, verify=self.verify)
+            return requests.get(f'{self.url}/audits?start={start_date.isoformat()}&end={end_date.isoformat()}', headers=self.headers, verify=self.verify)
 
 
 class VectraClientV2_2(VectraClientV2_1):
@@ -2289,7 +2268,7 @@ class VectraClientV2_2(VectraClientV2_1):
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
-        self.url = '{url}/api/v2.2'.format(url=url)
+        self.url = f'{url}/api/v2.2'
 
     def get_host_note(self, host_id=None):
         """
@@ -2299,7 +2278,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not host_id:
             raise ValueError('Host id required')
 
-        return requests.get('{url}/hosts/{id}/notes'.format(url=self.url, id=host_id), headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/hosts/{host_id}/notes', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2316,8 +2295,8 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.post('{url}/hosts/{id}/notes'.format(url=self.url, id=host_id), headers=self.headers, json=payload,
-            verify=self.verify)
+        return requests.post(f'{self.url}/hosts/{host_id}/notes', headers=self.headers, json=payload,
+                             verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2335,9 +2314,9 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.patch('{url}/hosts/{host_id}/notes/{note_id}'.format(url=self.url, host_id=host_id, note_id=note_id), 
-            headers=self.headers, json=payload, verify=self.verify)
-    
+        return requests.patch(f'{self.url}/hosts/{host_id}/notes/{note_id}',
+                              headers=self.headers, json=payload, verify=self.verify)
+
     @validate_api_v2
     @request_error_handler
     def delete_host_note(self, host_id=None, note_id=None):
@@ -2347,8 +2326,8 @@ class VectraClientV2_2(VectraClientV2_1):
         :param note_id: ID of the note to delete
         """
 
-        return requests.delete('{url}/hosts/{host_id}/notes/{note_id}'.format(url=self.url, host_id=host_id, note_id=note_id), 
-            headers=self.headers, verify=self.verify)
+        return requests.delete(f'{self.url}/hosts/{host_id}/notes/{note_id}',
+                               headers=self.headers, verify=self.verify)
 
     def get_detection_note(self, detection_id=None):
         """
@@ -2358,7 +2337,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not detection_id:
             raise ValueError('detection id required')
 
-        return requests.get('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/detections/{detection_id}/notes', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2375,8 +2354,8 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.post('{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), headers=self.headers, json=payload,
-            verify=self.verify)
+        return requests.post(f'{self.url}/detections/{detection_id}/notes', headers=self.headers, json=payload,
+                             verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2394,9 +2373,9 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.patch('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
-            headers=self.headers, json=payload, verify=self.verify)
-    
+        return requests.patch(f'{self.url}/detections/{detection_id}/notes/{note_id}',
+                              headers=self.headers, json=payload, verify=self.verify)
+
     @validate_api_v2
     @request_error_handler
     def delete_detection_note(self, detection_id=None, note_id=None):
@@ -2406,8 +2385,8 @@ class VectraClientV2_2(VectraClientV2_1):
         :param note_id: ID of the note to delete
         """
 
-        return requests.delete('{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), 
-            headers=self.headers, verify=self.verify)
+        return requests.delete(f'{self.url}/detections/{detection_id}/notes/{note_id}',
+                               headers=self.headers, verify=self.verify)
 
     def get_account_note(self, account_id=None):
         """
@@ -2417,7 +2396,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not account_id:
             raise ValueError('account id required')
 
-        return requests.get('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, verify=self.verify)
+        return requests.get(f'{self.url}/accounts/{account_id}/notes', headers=self.headers, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2434,8 +2413,8 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.post('{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), headers=self.headers, json=payload,
-            verify=self.verify)
+        return requests.post(f'{self.url}/accounts/{account_id}/notes', headers=self.headers, json=payload,
+                             verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
@@ -2453,9 +2432,9 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return requests.patch('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
-            headers=self.headers, json=payload, verify=self.verify)
-    
+        return requests.patch(f'{self.url}/accounts/{account_id}/notes/{note_id}',
+                              headers=self.headers, json=payload, verify=self.verify)
+
     @validate_api_v2
     @request_error_handler
     def delete_account_note(self, account_id=None, note_id=None):
@@ -2465,5 +2444,5 @@ class VectraClientV2_2(VectraClientV2_1):
         :param note_id: ID of the note to delete
         """
 
-        return requests.delete('{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), 
-            headers=self.headers, verify=self.verify)
+        return requests.delete(f'{self.url}/accounts/{account_id}/notes/{note_id}',
+                               headers=self.headers, verify=self.verify)
