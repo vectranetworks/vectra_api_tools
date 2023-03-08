@@ -1,6 +1,6 @@
 from setuptools import setup
 
-with open('README.md', 'r') as fh:
+with open(file='README.md', mode='r', encoding='utf-8') as fh:
     long_desc = fh.read()
 
 setup(
@@ -18,6 +18,7 @@ setup(
     },
     packages=['vat'],
     install_requires=['requests', 'pytz', 'cabby', 'stix'],
+
     python_requires='>=3.4',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
