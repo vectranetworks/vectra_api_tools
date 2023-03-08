@@ -298,9 +298,8 @@ class VectraClient(object):
         This is used by paginated endpoints
         :rtype: requests.Response
         """
-        params = {}
-        for k, v in kwargs.items():
-            params[k] = v
+        params: dict[str.Any] = kwargs.copy(
+        )  # already shorter, but if no shallow copy is required we can just use kwargs and be done with it
         if self.version == 2:
             return requests.get(url, headers=self.headers, params=params, verify=self.verify)
         else:
@@ -462,7 +461,7 @@ class VectraClient(object):
             params = None  # Avoid unnecessary copying of query params
 
     @request_error_handler
-    def get_host_by_id(self, host_id=None, **kwargs):
+    def get_host_by_id(self, host_id, **kwargs) -> requests.Response:
         """
         Get host by id
         :param host_id: host id - required
@@ -478,8 +477,6 @@ class VectraClient(object):
             sensor_name, severity, shell_knocker, state, suspicious_admin_learnings, t_score, tags, targets_key_asset,
             threat, url, vcenter
         """
-        if not host_id:
-            raise ValueError('Host id required')
 
         if self.version == 2:
             return requests.get(f'{self.url}/hosts/{host_id}', headers=self.headers,
@@ -490,40 +487,29 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def set_key_asset(self, host_id=None, set=True):
+    def set_key_asset(self, host_id, set=True) -> requests.Response:
         """
         (Un)set host as key asset
         :param host_id: id of host needing to be set - required
         :param set: set flag to true if setting host as key asset
         """
-
-        if not host_id:
-            raise ValueError('Host id required')
-
-        if set:
-            payload = {'key_asset': 'true'}
-        else:
-            payload = {'key_asset': 'false'}
-
+        payload: dict[str, str] = {'key_asset': 'true' if set else 'false'}
         return requests.patch(f'{self.url}/hosts/{host_id}', headers=self.headers, json=payload,
                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def get_host_tags(self, host_id=None):
+    def get_host_tags(self, host_id) -> requests.Response:
         """
         Get host tags
         :param host_id: ID of the host for which to retrieve the tags
         """
-        if not host_id:
-            raise ValueError('Host id required')
-
         return requests.get(f'{self.url}/tagging/host/{host_id}', headers=self.headers,
-                            verify=False)
+                            verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def set_host_tags(self, host_id=None, tags=[], append=False):
+    def set_host_tags(self, host_id: str, tags: list[str], append=False) -> requests.Response:
         """
         Set host tags
         :param host_id:
@@ -531,85 +517,71 @@ class VectraClient(object):
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear tags (default: False)
         """
-        if not host_id:
-            raise ValueError('Host id required')
-
-        if append and type(tags) == list:
-            current_list = self.get_host_tags(host_id=host_id).json()['tags']
-            payload = {
-                "tags": current_list + tags
-            }
-        elif type(tags) == list:
-            payload = {
-                "tags": tags
-            }
+        if append:
+            current_list = self.get_host_tags(host_id=host_id).json()[
+                'tags']  # TODO check type of tags
+            payload: dict[str, Any] = {"tags": current_list + tags}
         else:
-            raise TypeError('tags must be of type list')
+            payload = {"tags": tags}
 
         return requests.patch(f'{self.url}/tagging/host/{host_id}', headers=self.headers,
                               json=payload, verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def bulk_set_hosts_tag(self, tag, host_ids):
+    def bulk_set_hosts_tag(self, tag: str, host_ids: list[str]) -> requests.Response:
         """
         Set a tag in bulk on multiple hosts. Only one tag can be set at a time
         :param host_ids: IDs of the hosts for which to set the tag
         """
-        if not isinstance(host_ids, list):
-            raise TypeError('Host IDs must be of type list')
-
-        payload = {
+        payload: dict[str, Any] = {
             'objectIds': host_ids,
             'tag': tag
         }
         return requests.post(f'{self.url}/tagging/host', headers=self.headers, json=payload,
-                             verify=False)
+                             verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def bulk_delete_hosts_tag(self, tag, host_ids):
+    def bulk_delete_hosts_tag(self, tag: str, host_ids: list[str]) -> requests.Response:
         """
         Delete a tag in bulk on multiple hosts. Only one tag can be deleted at a time
         :param host_ids: IDs of the hosts on which to delete the tag
         """
-        if not isinstance(host_ids, list):
-            raise TypeError('Host IDs must be of type list')
-
-        payload = {
+        payload: dict[str, Any] = {
             'objectIds': host_ids,
             'tag': tag
         }
         return requests.delete(f'{self.url}/tagging/host', headers=self.headers, json=payload,
-                               verify=False)
+                               verify=self.verify)
 
     @validate_api_v2
     @request_error_handler
-    def get_host_note(self, host_id=None):
+    def get_host_note(self, host_id: str) -> requests.Response:
         """
         Get host notes
         :param host_id:
         For consistency we return a requests.models.Response object
         As we do not want to return the complete host body, we alter the response content
         """
-
-        if not host_id:
-            raise ValueError('Host id required')
-
-        host = requests.get(f'{self.url}/hosts/{host_id}',
-                            headers=self.headers, verify=self.verify)
-        if host.status_code == 200:
+        try:
+            host = requests.get(f'{self.url}/hosts/{host_id}',
+                                headers=self.headers, verify=self.verify)
             host_note = host.json()['note']
+
             # API endpoint return HTML escaped characters
-            host_note = html.unescape(host_note) if host_note else ''
+            host_note = json.loads(
+                host_note, object_hook=html.unescape) if host_note else ""
             json_dict = {'status': 'success',
-                         'host_id': str(host_id), 'note': host_note}
+                         'host_id': host_id, 'note': host_note}
             host._content = json.dumps(json_dict).encode('utf-8')
-        return host
+            return host
+        except:
+            raise ValueError(f'No host found for id {host_id}')
 
     @validate_api_v2
     @request_error_handler
-    def set_host_note(self, host_id=None, note='', append=False):
+    def set_host_note(self, host_id: str, note: str, append: bool = False) -> requests.Response:
         """
         Set host note
         :param host_id:
@@ -617,36 +589,18 @@ class VectraClient(object):
         :param append: overwrites existing note if set to False, appends if set to True
         Set to empty note string to clear host note
         """
-        if not host_id:
-            raise ValueError('Host id required')
-
-        if append and isinstance(note, str):
-            current_note = self.get_host_note(host_id=host_id).json()['note']
-            if current_note:
-                if len(note) > 0:
-                    payload = {
-                        "note": f'{current_note}\n{note}'
-                    }
-                else:
-                    payload = {
-                        "note": current_note
-                    }
-            else:
-                payload = {
-                    "note": note
-                }
-        elif isinstance(note, str):
-            payload = {
-                "note": note
-            }
+        if append:
+            current_note: str = self.get_host_note(
+                host_id=host_id).json()['note']
+            payload: dict[str, str] = {
+                "note": f"{current_note}\n{note}" if current_note else note}
         else:
-            raise TypeError('Note must be of type str')
-
+            payload = {"note": note}
         return requests.patch(f'{self.url}/hosts/{host_id}', headers=self.headers, data=json.dumps(payload),
                               verify=self.verify)
 
     @request_error_handler
-    def get_detections(self, **kwargs):
+    def get_detections(self, **kwargs) -> requests.Response:
         """
         Query all detections - all parameters are optional
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
@@ -692,7 +646,7 @@ class VectraClient(object):
             return requests.get(f'{self.url}/detections', auth=self.auth,
                                 params=self._generate_detection_params(kwargs), verify=self.verify)
 
-    def get_all_detections(self, **kwargs):
+    def get_all_detections(self, **kwargs) -> Generator[requests.Response, None, None]:
         """
         Generator to retrieve all detections - all parameters are optional
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
@@ -730,8 +684,8 @@ class VectraClient(object):
         :param threat_gte threat score is greater than or equal to (int)
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
-        resp = requests.get(f'{self.url}/detections', headers=self.headers,
-                            params=self._generate_detection_params(kwargs), verify=self.verify)
+        resp: requests.Response = requests.get(f'{self.url}/detections', headers=self.headers,
+                                               params=self._generate_detection_params(kwargs), verify=self.verify)
         yield resp
         while resp.json()['next']:
             resp = self._get_request(url=resp.json()['next'])
