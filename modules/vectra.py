@@ -1,5 +1,5 @@
 import json
-from typing import Any, Callable, Dict, Literal, Optional
+from typing import Any, Callable, Dict, Generator, Literal, Optional
 import requests
 import warnings
 import html
@@ -292,7 +292,7 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def _get_request(self, url, **kwargs):
+    def _get_request(self, url, **kwargs) -> requests.Response:
         """ 
         Do a get request on the provided URL
         This is used by paginated endpoints
@@ -308,7 +308,7 @@ class VectraClient(object):
 
     @validate_api_v2
     @request_error_handler
-    def get_campaigns(self, **kwargs):
+    def get_campaigns(self, **kwargs) -> requests.Response:
         """
         Query all campaigns - all parameters are optional
         :param dst_ip: filter on campaign destination IP
@@ -326,7 +326,7 @@ class VectraClient(object):
         return requests.get(f'{self.url}/campaigns', headers=self.headers,
                             params=self._generate_campaign_params(kwargs), verify=self.verify)
 
-    def get_all_campaigns(self, **kwargs):
+    def get_all_campaigns(self, **kwargs) -> Generator[requests.Response, None, None]:
         """
         Generator to retrieve all campaigns - all parameters are optional
         :param dst_ip: filter on campaign destination IP
@@ -341,27 +341,26 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = requests.get(f'{self.url}/campaigns', headers=self.headers,
-                            params=self._generate_campaign_params(kwargs), verify=self.verify)
-        yield resp
-        while resp.json()['next']:
-            resp = self._get_request(url=resp.json()['next'])
+        url: str = f"{self.url}/campaigns"
+        params: dict[str, Any | None] = self._generate_campaign_params(kwargs)
+        while url:
+            resp: requests.Response = self._get_request(
+                url=url, headers=self.headers, params=params, verify=self.verify)
             yield resp
+            url = resp.json().get('next')
+            params = None  # Avoid unnecessary copying of query params on 2nd to last iteration
 
     @validate_api_v2
     @request_error_handler
-    def get_campaign_by_id(self, campaign_id=None, **kwargs):
+    def get_campaign_by_id(self, campaign_id) -> requests.Response:
         """
         Get campaign by id
         """
-        if not campaign_id:
-            raise ValueError('Campaign id required')
-
         return requests.get(f'{self.url}/campaigns/{campaign_id}',
                             headers=self.headers, verify=self.verify)
 
     @request_error_handler
-    def get_hosts(self, **kwargs):
+    def get_hosts(self, **kwargs) -> requests.Response:
         """
         Query all hosts - all parameters are optional
         :param all: if set to False, endpoint will only return hosts that have active detections, active traffic or are marked as key assets - default False
@@ -411,7 +410,7 @@ class VectraClient(object):
             return requests.get(f'{self.url}/hosts', auth=self.auth,
                                 params=self._generate_host_params(kwargs), verify=self.verify)
 
-    def get_all_hosts(self, **kwargs):
+    def get_all_hosts(self, **kwargs) -> Generator[requests.Response, None, None]:
         """
         Generator to retrieve all hosts - all parameters are optional
         :param all: if set to False, endpoint will only return hosts that have active detections, active traffic or are marked as key assets - default False
@@ -453,12 +452,14 @@ class VectraClient(object):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        resp = requests.get(f'{self.url}/hosts', headers=self.headers,
-                            params=self._generate_host_params(kwargs), verify=self.verify)
-        yield resp
-        while resp.json()['next']:
-            resp = self._get_request(url=resp.json()['next'])
+        url: str = f"{self.url}/hosts"
+        params: dict[str, Any] = self._generate_host_params(kwargs)
+        while url:
+            resp: requests.Response = self._get_request(
+                url=url, headers=self.headers, params=params, verify=self.verify)
             yield resp
+            url = resp.json().get('next')
+            params = None  # Avoid unnecessary copying of query params
 
     @request_error_handler
     def get_host_by_id(self, host_id=None, **kwargs):
