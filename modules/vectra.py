@@ -89,14 +89,14 @@ class VectraClient(object):
         url = VectraClient._remove_trailing_slashes(url)
 
         if token:
-            self.url = '{url}/api/v2'.format(url=url)
+            self.url = f'{url}/api/v2'
             self.headers = {
                 'Authorization': "Token " + token.strip(),
                 'Content-Type': "application/json",
                 'Cache-Control': "no-cache"
             }
         elif user and password:
-            self.url = '{url}/api'.format(url=url)
+            self.url = f'{url}/api'
             self.auth = (user, password)
             deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
                         ' when possible')
@@ -143,7 +143,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid campaign query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
         return params
 
     @staticmethod
@@ -165,7 +165,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid host query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
             if k in deprecated_keys: param_deprecation(k)
         return params
 
@@ -182,7 +182,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid host query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
         return params
 
     @staticmethod
@@ -203,7 +203,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid detection query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid detection query parameter')
             if k in deprecated_keys: param_deprecation(k)
         return params
 
@@ -221,7 +221,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid group query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid group query parameter')
         return params
 
     @staticmethod
@@ -237,7 +237,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid rule query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid rule query parameter')
         return params
 
     @staticmethod
@@ -253,7 +253,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid rule query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid rule query parameter')
         return params
     
     @staticmethod
@@ -269,7 +269,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid user query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid user query parameter')
         return params
 
     @staticmethod
@@ -285,7 +285,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid ip address query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid ip address query parameter')
         return params
 
     @staticmethod
@@ -301,7 +301,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid subnet query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid subnet query parameter')
         return params
 
     @staticmethod
@@ -317,7 +317,7 @@ class VectraClient(object):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid internal network query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid internal network query parameter')
         return params
 
     @validate_api_v2
@@ -336,7 +336,7 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        return self._request(method='get', url='{url}/campaigns'.format(url=self.url), params=self._generate_campaign_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/campaigns', params=self._generate_campaign_params(kwargs))
     
     def get_all_campaigns(self, **kwargs):
         """
@@ -353,7 +353,7 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = self._request(method='get', url='{url}/campaigns'.format(url=self.url), params=self._generate_campaign_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/campaigns', params=self._generate_campaign_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -367,7 +367,7 @@ class VectraClient(object):
         if not campaign_id:
             raise ValueError('Campaign id required')
 
-        return self._request(method='get', url='{url}/campaigns/{id}'.format(url=self.url, id=campaign_id))
+        return self._request(method='get', url=f'{self.url}/campaigns/{campaign_id}')
 
     def get_hosts(self, **kwargs):
         """
@@ -411,7 +411,7 @@ class VectraClient(object):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        return self._request(method='get', url='{url}/hosts'.format(url=self.url), params=self._generate_host_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/hosts', params=self._generate_host_params(kwargs))
 
     def get_all_hosts(self, **kwargs):
         """
@@ -455,7 +455,7 @@ class VectraClient(object):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        resp = self._request(method='get', url='{url}/hosts'.format(url=self.url), params=self._generate_host_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/hosts', params=self._generate_host_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -480,7 +480,7 @@ class VectraClient(object):
         if not host_id:
             raise ValueError('Host id required')
         
-        return self._request(method='get', url='{url}/hosts/{id}'.format(url=self.url, id=host_id), params=self._generate_host_by_id_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/hosts/{host_id}', params=self._generate_host_by_id_params(kwargs))
 
     @validate_api_v2
     def set_key_asset(self, host_id=None, set=True):
@@ -498,7 +498,7 @@ class VectraClient(object):
         else:
             payload = {'key_asset':'false'}
 
-        return self._request(method='patch', url='{url}/hosts/{id}'.format(url=self.url, id=host_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/hosts/{host_id}', json=payload)
 
     @validate_api_v2
     def get_host_tags(self, host_id=None):
@@ -509,7 +509,7 @@ class VectraClient(object):
         if not host_id:
             raise ValueError('Host id required')
 
-        return self._request(method='get', url='{url}/tagging/host/{id}'.format(url=self.url, id=host_id))
+        return self._request(method='get', url=f'{self.url}/tagging/host/{host_id}')
 
     @validate_api_v2
     def set_host_tags(self, host_id=None, tags=[], append=False):
@@ -535,7 +535,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        return self._request(method='patch', url='{url}/tagging/host/{id}'.format(url=self.url, id=host_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/tagging/host/{host_id}', json=payload)
 
     @validate_api_v2
     def bulk_set_hosts_tag(self, tag, host_ids):
@@ -550,7 +550,7 @@ class VectraClient(object):
             'objectIds': host_ids,
             'tag': tag
         }
-        return self._request(method='post', url='{url}/tagging/host'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/tagging/host', json=payload)
 
     @validate_api_v2
     def bulk_delete_hosts_tag(self, tag, host_ids):
@@ -565,7 +565,7 @@ class VectraClient(object):
             'objectIds': host_ids,
             'tag': tag
         }
-        return self._request(method='delete', url='{url}/tagging/host'.format(url=self.url), json=payload)
+        return self._request(method='delete', url=f'{self.url}/tagging/host', json=payload)
 
     @validate_api_v2
     def get_host_note(self, host_id=None):
@@ -579,7 +579,7 @@ class VectraClient(object):
         if not host_id:
             raise ValueError('Host id required')
 
-        host = self._request(method='get', url='{url}/hosts/{id}'.format(url=self.url, id=host_id))
+        host = self._request(method='get', url=f'{self.url}/hosts/{host_id}')
         if host.status_code == 200:
             host_note = host.json()['note']
             # API endpoint return HTML escaped characters
@@ -605,7 +605,7 @@ class VectraClient(object):
             if current_note:
                 if len(note) > 0:
                     payload = {
-                        "note": '{}{}{}'.format(current_note, '\n', note)
+                        "note": f'{current_note}\n{note}'
                     }
                 else:
                     payload = {
@@ -621,7 +621,7 @@ class VectraClient(object):
             }
         else:
             raise TypeError('Note must be of type str')
-        return self._request(method='patch', url='{url}/hosts/{id}'.format(url=self.url, id=host_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/hosts/{host_id}', json=payload)
 
     def get_detections(self, **kwargs):
         """
@@ -661,7 +661,7 @@ class VectraClient(object):
         :param threat_gte threat score is greater than or equal to (int)
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
-        return self._request(method='get', url='{url}/detections'.format(url=self.url), params=self._generate_detection_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/detections', params=self._generate_detection_params(kwargs))
 
     def get_all_detections(self, **kwargs):
         """
@@ -701,7 +701,7 @@ class VectraClient(object):
         :param threat_gte threat score is greater than or equal to (int)
         :param note_modified_timestamp_gte: note last modified timestamp greater than or equal to (datetime)
         """
-        resp = self._request(method='get', url='{url}/detections'.format(url=self.url), params=self._generate_detection_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/detections', params=self._generate_detection_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -722,7 +722,7 @@ class VectraClient(object):
         if not detection_id:
             raise ValueError('Detection id required')
 
-        return self._request(method='get', url='{url}/detections/{id}'.format(url=self.url, id=detection_id), params=self._generate_detection_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/detections/{detection_id}', params=self._generate_detection_params(kwargs))
 
     @validate_api_v2
     def mark_detections_fixed(self, detection_ids=None):
@@ -753,7 +753,7 @@ class VectraClient(object):
             'mark_as_fixed': str(fixed)
             }
 
-        return self._request(method='patch', url='{url}/detections'.format(url=self.url), json=payload)
+        return self._request(method='patch', url=f'{self.url}/detections', json=payload)
 
     @validate_api_v2
     def mark_detections_custom(self, detection_ids=[], triage_category=None):
@@ -771,7 +771,7 @@ class VectraClient(object):
             "detectionIdList": detection_ids
         }
 
-        return self._request(method='post', url='{url}/rules'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/rules', json=payload)
 
     @validate_api_v2
     def unmark_detections_custom(self, detection_ids=[]):
@@ -787,7 +787,7 @@ class VectraClient(object):
             "detectionIdList": detection_ids
         }
 
-        response = self._request(method='delete', url='{url}/rules'.format(url=self.url), json=payload)
+        response = self._request(method='delete', url=f'{self.url}/rules', json=payload)
 
         # DELETE returns an empty response, but we populate the response for consistency with the mark_as_fixed() function
         json_dict = {'_meta': {'message': 'Successfully unmarked detections', 'level': 'Success'}}
@@ -801,7 +801,7 @@ class VectraClient(object):
         Get detection tags
         :param detection_id:
         """
-        return self._request(method='get', url='{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id))
+        return self._request(method='get', url=f'{self.url}/tagging/detection/{detection_id}')
 
     @validate_api_v2
     def set_detection_tags(self, detection_id=None, tags=[], append=False):
@@ -824,7 +824,7 @@ class VectraClient(object):
         else:
             raise TypeError('tags must be of type list')
 
-        return self._request(method='patch', url='{url}/tagging/detection/{id}'.format(url=self.url, id=detection_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/tagging/detection/{detection_id}', json=payload)
 
     @validate_api_v2
     def bulk_set_detections_tag(self, tag, detection_ids):
@@ -839,7 +839,7 @@ class VectraClient(object):
             'objectIds': detection_ids,
             'tag': tag
         }
-        return self._request(method='post', url='{url}/tagging/detection'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/tagging/detection', json=payload)
 
     @validate_api_v2
     def bulk_delete_detections_tag(self, tag, detection_ids):
@@ -854,7 +854,7 @@ class VectraClient(object):
             'objectIds': detection_ids,
             'tag': tag
         }
-        return self._request(method='delete', url='{url}/tagging/detection'.format(url=self.url), json=payload)
+        return self._request(method='delete', url=f'{self.url}/tagging/detection', json=payload)
 
     @validate_api_v2
     def get_detection_note(self, detection_id=None):
@@ -864,7 +864,7 @@ class VectraClient(object):
         For consistency we return a requests.models.Response object
         As we do not want to return the complete detection body, we alter the response content
         """
-        detection = self._request(method='get', url='{url}/detections/{id}'.format(url=self.url, id=detection_id))
+        detection = self._request(method='get', url=f'{self.url}/detections/{detection_id}')
         if detection.status_code == 200:
             detection_note = detection.json()['note']
             # API endpoint return HTML escaped characters
@@ -887,7 +887,7 @@ class VectraClient(object):
             if current_note:
                 if len(note) > 0:
                     payload = {
-                        "note": '{}{}{}'.format(current_note, '\n', note)
+                        "note": f'{current_note}\n{note}'
                     }
                 else:
                     payload = {
@@ -904,7 +904,7 @@ class VectraClient(object):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='patch', url='{url}/detections/{id}'.format(url=self.url, id=detection_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/detections/{detection_id}', json=payload)
 
     @validate_api_v2
     def get_detection_pcap(self, detection_id=None, filename=None):
@@ -913,7 +913,7 @@ class VectraClient(object):
         :param detection_id: ID of the detection for which to get a pcap
         :param filename: filename to write the pcap to. Will be overwriten if already exists.
         """
-        response = self._request(method='get', url='{url}/detections/{id}/pcap'.format(url=self.url, id=detection_id))
+        response = self._request(method='get', url=f'{self.url}/detections/{detection_id}/pcap')
         if response.status_code not in [200, 201, 204]:
             raise HTTPException(response)
 
@@ -953,7 +953,7 @@ class VectraClient(object):
             deprecation('The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function')
             return self.get_rule_by_id(rule_id)
         else:
-            return self._request(method='get', url='{url}/rules'.format(url=self.url), params=self._generate_rule_params(kwargs))
+            return self._request(method='get', url=f'{self.url}/rules', params=self._generate_rule_params(kwargs))
 
     @validate_api_v2
     def get_rule_by_id(self, rule_id, **kwargs):
@@ -973,7 +973,7 @@ class VectraClient(object):
 
         deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
 
-        return self._request(method='get', url='{url}/rules/{id}'.format(url=self.url, id=rule_id), params=self._generate_rule_by_id_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/rules/{rule_id}', params=self._generate_rule_by_id_params(kwargs))
 
     # TODO make return type requests.Reponse
     @validate_api_v2
@@ -1006,7 +1006,7 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = self._request(method='get', url='{url}/rules'.format(url=self.url), params=self._generate_rule_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/rules', params=self._generate_rule_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url = resp.json()['next'])
@@ -1077,9 +1077,9 @@ class VectraClient(object):
             if k in valid_keys:
                 payload[k] = v
             else:
-                raise ValueError('argument {} is an invalid field for rule creation'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid field for rule creation')
 
-        return self._request(method='post', url='{url}/rules'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/rules', json=payload)
 
     @validate_api_v2
     def update_rule(self, rule_id=None, name=None, append=False, **kwargs):
@@ -1154,9 +1154,9 @@ class VectraClient(object):
                 else:
                     rule[k] = v
             else:
-                raise ValueError('invalid parameter provided: {}'.format(str(k)))
+                raise ValueError(f'invalid parameter provided: {str(k)}')
 
-        return self._request(method='put', url='{url}/rules/{id}'.format(url=self.url, id=rule['id']), json=rule)
+        return self._request(method='put', url=f'{self.url}/rules/{rule["id"]}', json=rule)
 
     @validate_api_v2
     def delete_rule(self, rule_id=None, restore_detections=True):
@@ -1174,7 +1174,7 @@ class VectraClient(object):
             'restore_detections': restore_detections
         }
 
-        return self._request(method='delete', url='{url}/rules/{id}'.format(url=self.url, id=rule_id), params=params)
+        return self._request(method='delete', url=f'{self.url}/rules/{rule_id}', params=params)
 
     @validate_api_v2
     def get_groups(self, **kwargs):
@@ -1192,7 +1192,7 @@ class VectraClient(object):
         :param type: type of group to search (domain/host/ip)
         """
 
-        return self._request(method='get', url='{url}/groups'.format(url=self.url), params=self._generate_group_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/groups', params=self._generate_group_params(kwargs))
 
     @validate_api_v2
     def get_all_groups(self, **kwargs):
@@ -1209,7 +1209,7 @@ class VectraClient(object):
         :param page_size: number of object to return in repsonse (int)
         :param type: type of group to search (domain/host/ip)
         """
-        resp = self._request(method='get', url='{url}/groups'.format(url=self.url), params=self._generate_group_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/groups', params=self._generate_group_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1221,7 +1221,7 @@ class VectraClient(object):
         Get groups by id
         :param rule_id: id of group to retrieve
         """
-        return self._request(method='get', url='{url}/groups/{id}'.format(url=self.url, id=group_id))
+        return self._request(method='get', url=f'{self.url}/groups/{group_id}')
 
     def get_groups_by_name(self, name=None, description=None):
         """
@@ -1271,10 +1271,10 @@ class VectraClient(object):
 
         for k, v in kwargs.items():
             if not type(v) == list:
-                raise TypeError("{} must be of type: list".format(k))
+                raise TypeError(f"{k} must be of type: list")
             payload[k] = v
 
-        return self._request(method='post', url='{url}/groups'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/groups', json=payload)
 
     @validate_api_v2
     def update_group(self, group_id, name=None, description=None, members=[], append=False):
@@ -1294,7 +1294,7 @@ class VectraClient(object):
         try:
             id = group['id']
         except KeyError:
-            raise KeyError('Group with id {} was not found'.format(str(group_id)))
+            raise KeyError(f'Group with id {str(group_id)} was not found')
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
@@ -1315,7 +1315,7 @@ class VectraClient(object):
             "description": description,
             "members": members
         }
-        return self._request(method='patch', url='{url}/groups/{id}'.format(url=self.url, id=id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/groups/{id}', json=payload)
 
     @validate_api_v2
     def delete_group(self, group_id=None):
@@ -1324,7 +1324,7 @@ class VectraClient(object):
         :param group_id:
         detections
         """
-        return self._request(method='delete', url='{url}/groups/{id}'.format(url=self.url, id=group_id))
+        return self._request(method='delete', url=f'{self.url}/groups/{group_id}')
 
     @validate_api_v2
     def get_all_users(self, **kwargs):
@@ -1336,7 +1336,7 @@ class VectraClient(object):
         :param authentication_profile: filter by authentication profile
         :param last_login_gte: filter for users that have logged in since the given timestamp
         """
-        resp = self._request(method='get', url='{url}/users'.format(url=self.url), params=self._generate_user_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/users', params=self._generate_user_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url = resp.json()['next'])
@@ -1351,7 +1351,7 @@ class VectraClient(object):
         if not user_id:
             raise ValueError('User id required')
 
-        return self._request(method='get', url='{url}/users/{id}'.format(url=self.url, id=user_id))
+        return self._request(method='get', url=f'{self.url}/users/{user_id}')
 
     @validate_api_v2
     def update_user(self, user_id=None, account_type=None, authentication_profile=None):
@@ -1375,7 +1375,7 @@ class VectraClient(object):
             'authentication_profile': authentication_profile
         }
 
-        return self._request(method='patch', url='{url}/users/{id}'.format(url=self.url, id=user_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/users/{user_id}', json=payload)
 
     @validate_api_v2
     def get_proxies(self, proxy_id=None):
@@ -1386,7 +1386,7 @@ class VectraClient(object):
             deprecation('The "proxy_id" argument will be removed from this function, please use the get_proxy_by_id() function')
             return self.get_proxy_by_id(proxy_id=proxy_id)
         else:
-            return self._request(method='get', url='{url}/proxies'.format(url=self.url))
+            return self._request(method='get', url=f'{self.url}/proxies')
 
     @validate_api_v2
     def get_proxy_by_id(self, proxy_id=None):
@@ -1397,7 +1397,7 @@ class VectraClient(object):
         if not proxy_id:
             raise ValueError('Proxy id required')
 
-        return self._request(method='get', url='{url}/proxies/{id}'.format(url=self.url, id=proxy_id))
+        return self._request(method='get', url=f'{self.url}/proxies/{proxy_id}')
 
     @validate_api_v2
     def add_proxy(self, address=None, enable=True):
@@ -1413,7 +1413,7 @@ class VectraClient(object):
             }
         }
 
-        return self._request(method='post', url='{url}/proxies'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/proxies', json=payload)
 
     # TODO PATCH request modifies the proxy ID  and 404 is actually a 500 - APP-15864
     @validate_api_v2
@@ -1435,7 +1435,7 @@ class VectraClient(object):
         if enable is not None:
             payload["proxy"]["considerProxy"] = enable
 
-        return self._request(method='patch', url='{url}/proxies/{id}'.format(url=self.url, id=proxy_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/proxies/{proxy_id}', json=payload)
 
     @validate_api_v2
     def delete_proxy(self,proxy_id=None):
@@ -1443,7 +1443,7 @@ class VectraClient(object):
         Delete a proxy from the proxy list
         :param proxy_id: ID of the proxy to delete
         """
-        return self._request(method='delete', url='{url}/proxies/{id}'.format(url=self.url, id=proxy_id))
+        return self._request(method='delete', url=f'{self.url}/proxies/{proxy_id}')
 
     @validate_api_v2
     def create_feed(self, name, category, certainty, itype, duration:int):
@@ -1458,13 +1458,13 @@ class VectraClient(object):
         :returns: request object
         """
         if not category in ['lateral', 'exfil', 'cnc']:
-            raise ValueError('Invalid category provided: {}'.format(category))
+            raise ValueError(f'Invalid category provided: {category}')
 
         if not certainty in ['Low', 'Medium', 'High']:
-            raise ValueError('Invalid certainty provided: {}'.format(str(certainty)))
+            raise ValueError(f'Invalid certainty provided: {str(certainty)}')
 
         if not itype in ['Anonymize', 'Exfiltration', 'Malware Artifacts', 'Watchlist', 'C2']:
-            raise ValueError('Invalid itype provided: {}'.format(str(itype)))
+            raise ValueError(f'Invalid itype provided: {str(itype)}')
         
         if not isinstance(duration, int):
             raise ValueError('Invalid duration provided, duration must be an integer value')
@@ -1481,7 +1481,7 @@ class VectraClient(object):
             }
         }
 
-        return self._request(method='post', url='{url}/threatFeeds'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/threatFeeds', json=payload)
 
     @validate_api_v2
     def delete_feed(self, feed_id=None):
@@ -1489,14 +1489,14 @@ class VectraClient(object):
         Deletes threat feed from Vectra
         :param feed_id: id of threat feed (returned by get_feed_by_name())
         """
-        return self._request(method='delete', url='{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id))
+        return self._request(method='delete', url=f'{self.url}/threatFeeds/{feed_id}')
 
     @validate_api_v2
     def get_feeds(self):
         """
         Gets list of currently configured threat feeds
         """
-        return self._request(method='get', url='{url}/threatFeeds'.format(url=self.url))
+        return self._request(method='get', url=f'{self.url}/threatFeeds')
 
     @validate_api_v2
     def get_feed_by_name(self, name=None):
@@ -1505,7 +1505,7 @@ class VectraClient(object):
         :param name: name of threat feed
         """
         try:
-            response = self._request(method='get', url='{url}/threatFeeds'.format(url=self.url))
+            response = self._request(method='get', url=f'{self.url}/threatFeeds')
         except requests.ConnectionError:
             raise Exception('Unable to connect to remote host')
 
@@ -1525,7 +1525,7 @@ class VectraClient(object):
         """
         headers = copy.deepcopy(self.headers)
         headers.pop('Content-Type', None)
-        return self._request(method='post', url='{url}/threatFeeds/{id}'.format(url=self.url, id=feed_id), headers=headers, files={'file': open(stix_file)})
+        return self._request(method='post', url=f'{self.url}/threatFeeds/{feed_id}', headers=headers, files={'file': open(stix_file)})
 
     @validate_api_v2
     def advanced_search(self, stype=None, page_size=50, query=None):
@@ -1547,7 +1547,7 @@ class VectraClient(object):
             'query_string': query
         }
 
-        resp = self._request(method='get', url='{url}/search/{stype}'.format(url=self.url, stype=stype), params=params)
+        resp = self._request(method='get', url=f'{self.url}/search/{stype}', params=params)
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1558,7 +1558,7 @@ class VectraClient(object):
         """
         Generator to get all traffic stats
         """
-        resp = self._request(method='get', url='{url}/traffic'.format(url=self.url))
+        resp = self._request(method='get', url=f'{self.url}/traffic')
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1573,7 +1573,7 @@ class VectraClient(object):
         if not sensor_luid:
             raise ValueError('Sensor LUID required')
 
-        resp = self._request(method='get', url='{url}/traffic/{luid}'.format(url=self.url, luid=sensor_luid))
+        resp = self._request(method='get', url=f'{self.url}/traffic/{sensor_luid}')
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1587,7 +1587,7 @@ class VectraClient(object):
             possible values are: subnet, hosts, firstSeen, lastSeen
         :param search: only return subnets containing the search string
         """
-        resp = self._request(method='get', url='{url}/subnets'.format(url=self.url), params=self._generate_subnet_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/subnets', params=self._generate_subnet_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1605,7 +1605,7 @@ class VectraClient(object):
         if not sensor_luid:
             raise ValueError('Sensor LUID required')
 
-        resp = self._request(method='get', url='{url}/subnets/{luid}'.format(url=self.url, luid=sensor_luid), params=self._generate_subnet_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/subnets/{sensor_luid}', params=self._generate_subnet_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1619,14 +1619,14 @@ class VectraClient(object):
         :param include_ipv4: Include IPv4 addresses - default True
         :param include_ipv6: Include IPv6 addresses - default True
         """
-        return self._request(method='get', url='{url}/ip_addresses'.format(url=self.url), params=self._generate_ip_address_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/ip_addresses', params=self._generate_ip_address_params(kwargs))
 
     @validate_api_v2
     def get_internal_networks(self):
         """
         Get all internal networks configured on the brain
         """
-        return self._request(method='get', url='{url}/settings/internal_network'.format(url=self.url))
+        return self._request(method='get', url=f'{self.url}/settings/internal_network')
 
     @validate_api_v2
     def set_internal_networks(self, include=[], exclude=[], drop=[], append=True):
@@ -1657,7 +1657,7 @@ class VectraClient(object):
         else:
             raise TypeError('subnets must be of type list')
 
-        return self._request(method='post', url='{url}/settings/internal_network'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/settings/internal_network', json=payload)
 
     @validate_api_v2
     def get_health_check(self, check=None):
@@ -1667,11 +1667,11 @@ class VectraClient(object):
             possible values are: cpu, disk, hostid, memory, network, power, sensors, system
         """
         if not check:
-            return self._request(method='get', url='{url}/health'.format(url=self.url))
+            return self._request(method='get', url=f'{self.url}/health')
         else:
             if not isinstance(check, str):
                 raise ValueError('check need to be a string')
-            return self._request(method='get', url='{url}/health/{check}'.format(url=self.url, check=check))
+            return self._request(method='get', url=f'{self.url}/health/{check}')
         
 
 class VectraClientV2_1(VectraClient):
@@ -1687,7 +1687,7 @@ class VectraClientV2_1(VectraClient):
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
-        self.url = '{url}/api/v2.1'.format(url=url)
+        self.url = f'{url}/api/v2.1'
         self.version = 2.1
 
     @staticmethod
@@ -1708,7 +1708,7 @@ class VectraClientV2_1(VectraClient):
             if k in valid_keys:
                 if v is not None: params[k] = v
             else:
-                raise ValueError('argument {} is an invalid account query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid account query parameter')
         return params
 
     @staticmethod
@@ -1728,9 +1728,9 @@ class VectraClientV2_1(VectraClient):
                     if search.match(v):
                         params[k] = v
                     else:
-                        raise ValueError('{} is not a valid date string for detect usage query'.format(str(v)))
+                        raise ValueError(f'{str(v)} is not a valid date string for detect usage query')
             else:
-                raise ValueError('argument {} is an invalid detect usage query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid detect usage query parameter')
         return params
 
     def get_campaigns(self, **kwargs):
@@ -1775,7 +1775,7 @@ class VectraClientV2_1(VectraClient):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
-        resp = self._request(method='get', url='{url}/accounts'.format(url=self.url), params=self._generate_account_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/accounts', params=self._generate_account_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1797,7 +1797,7 @@ class VectraClientV2_1(VectraClient):
         Get Account tags
         :param account_id: ID of the account for which to retrieve the tags
         """
-        return self._request(method='get', url='{url}/tagging/account/{id}'.format(url=self.url, id=account_id))
+        return self._request(method='get', url=f'{self.url}/tagging/account/{account_id}')
 
     def set_account_tags(self, account_id=None, tags=[], append=False):
         """
@@ -1819,7 +1819,7 @@ class VectraClientV2_1(VectraClient):
         else:
             raise TypeError('tags must be of type list')
 
-        return self._request(method='patch', url='{url}/tagging/account/{id}'.format(url=self.url, id=account_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/tagging/account/{account_id}', json=payload)
 
     def bulk_set_accounts_tag(self, tag, account_ids):
         """
@@ -1834,7 +1834,7 @@ class VectraClientV2_1(VectraClient):
             'objectIds': account_ids,
             'tag': tag
         }
-        return self._request(method='post', url='{url}/tagging/account'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/tagging/account', json=payload)
 
     @request_error_handler
     def bulk_delete_accounts_tag(self, tag, account_ids):
@@ -1850,7 +1850,7 @@ class VectraClientV2_1(VectraClient):
             'objectIds': account_ids,
             'tag': tag
         }
-        return self._request(method='delete', url='{url}/tagging/account'.format(url=self.url),  json=payload)
+        return self._request(method='delete', url=f'{self.url}/tagging/account',  json=payload)
 
     def get_account_note(self, account_id=None):
         """
@@ -1872,7 +1872,7 @@ class VectraClientV2_1(VectraClient):
         """
         Get list of account locked by Account Lockdown
         """
-        return self._request(method='get', url='{url}/lockdown/account'.format(url=self.url))
+        return self._request(method='get', url=f'{self.url}/lockdown/account')
 
     def get_rules(self, **kwargs):
         raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_rules() which supports pagination')
@@ -1896,7 +1896,7 @@ class VectraClientV2_1(VectraClient):
             'query_string': query
         }
 
-        resp = self._request(method='get', url='{url}/search/{stype}'.format(url=self.url, stype=stype), params=params)
+        resp = self._request(method='get', url=f'{self.url}/search/{stype}', params=params)
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -1914,7 +1914,7 @@ class VectraClientV2_1(VectraClient):
         if not rule_id:
             raise ValueError('Rule id required')
 
-        return self._request(method='get', url='{url}/rules/{id}'.format(url=self.url, id=rule_id), params=self._generate_rule_by_id_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/rules/{rule_id}', params=self._generate_rule_by_id_params(kwargs))
 
     def get_rules_by_name(self, triage_category=None, description=None):
         raise DeprecationWarning('This function has been deprecated in the Vectra API client v2.1. Please use get_all_rules with the "contains" query parameter')
@@ -1932,7 +1932,7 @@ class VectraClientV2_1(VectraClient):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        resp = self._request(method='get', url='{url}/rules'.format(url=self.url), params=self._generate_rule_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/rules', params=self._generate_rule_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get',url = resp.json()['next'])
@@ -2023,7 +2023,7 @@ class VectraClientV2_1(VectraClient):
             'additional_conditions': additional_conditions
             }
 
-        return self._request(method='post', url='{url}/rules'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/rules', json=payload)
 
     def update_rule(self, rule_id=None, **kwargs):
         """
@@ -2105,9 +2105,9 @@ class VectraClientV2_1(VectraClient):
             if k in valid_keys:
                 rule[k] = v
             else:
-                raise ValueError('invalid parameter provided: {}'.format(str(k)))
+                raise ValueError(f'invalid parameter provided: {str(k)}')
 
-        return self._request(method='put', url='{url}/rules/{id}'.format(url=self.url, id=rule['id']), json=rule)
+        return self._request(method='put', url=f'{self.url}/rules/{rule_id}', json=rule)
 
     def get_groups(self, **kwargs):
         raise DeprecationWarning('This function has been deprecated in the Vectra API client starting with v2.1. Please use get_all_groups() which supports pagination')
@@ -2122,7 +2122,7 @@ class VectraClientV2_1(VectraClient):
         :param end: end month for the usage statistics - format YYYY-mm
         Default is statistics from last month
         """
-        return self._request(method='get', url='{url}/usage/detect'.format(url=self.url), params=self._generate_detect_usage_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/usage/detect', params=self._generate_detect_usage_params(kwargs))
 
     def get_audits(self, start_date=None, end_date=None):
         """
@@ -2131,13 +2131,13 @@ class VectraClientV2_1(VectraClient):
         :param end_date: end date (datetime.date), GMT, defaults to date.max
         """
         if start_date is None and end_date is None:
-            return self._request(method='get', url='{url}/audits'.format(url=self.url))
+            return self._request(method='get', url=f'{self.url}/audits')
         elif start_date is None and end_date is not None:
-            return self._request(method='get', url='{url}/audits?end={end}'.format(url=self.url, end=end_date.isoformat()))
+            return self._request(method='get', url=f'{self.url}/audits?end={end_date.isoformat()}')
         elif start_date is not None and end_date is None:
-            return self._request(method='get', url='{url}/audits?start={start}'.format(url=self.url, start=start_date.isoformat()))
+            return self._request(method='get', url=f'{self.url}/audits?start={start_date.isoformat()}')
         else:
-            return self._request(method='get', url='{url}/audits?start={start}&end={end}'.format(url=self.url, start=start_date.isoformat(), end=end_date.isoformat()))
+            return self._request(method='get', url=f'{self.url}/audits?start={start_date.isoformat()}&end={end_date.isoformat()}')
 
 class VectraClientV2_2(VectraClientV2_1):
 
@@ -2152,7 +2152,7 @@ class VectraClientV2_2(VectraClientV2_1):
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
-        self.url = '{url}/api/v2.2'.format(url=url)
+        self.url = f'{url}/api/v2.2'
         self.version = 2.2
 
     @staticmethod
@@ -2176,7 +2176,7 @@ class VectraClientV2_2(VectraClientV2_1):
                     else:
                         params[k] = v
             else:
-                raise ValueError('argument {} is an invalid assignment query parameter'.format(str(k)))
+                raise ValueError(f'argument {str(k)} is an invalid assignment query parameter')
         return params
 
     # TODO remove this function if APIv < 2.2. is officially retired
@@ -2192,7 +2192,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not account_id:
             raise ValueError('Account id required')
 
-        return self._request(method='get', url='{url}/accounts/{id}'.format(url=self.url, id=account_id), params=self._generate_account_params(kwargs))
+        return self._request(method='get', url=f'{self.url}/accounts/{account_id}', params=self._generate_account_params(kwargs))
 
     def get_host_note(self, host_id=None):
         """
@@ -2202,7 +2202,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not host_id:
             raise ValueError('Host id required')
 
-        return self._request(method='get', url='{url}/hosts/{id}/notes'.format(url=self.url, id=host_id))
+        return self._request(method='get', url=f'{self.url}/hosts/{host_id}/notes')
 
     def set_host_note(self, host_id=None, note=''):
         """
@@ -2217,7 +2217,7 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='post', url='{url}/hosts/{id}/notes'.format(url=self.url, id=host_id), json=payload)
+        return self._request(method='post', url=f'{self.url}/hosts/{host_id}/notes', json=payload)
 
     def update_host_note(self, host_id=None, note_id=None, note=''):
         """
@@ -2233,7 +2233,7 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='patch', url='{url}/hosts/{host_id}/notes/{note_id}'.format(url=self.url, host_id=host_id, note_id=note_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/hosts/{host_id}/notes/{note_id}', json=payload)
     
     def delete_host_note(self, host_id=None, note_id=None):
         """
@@ -2242,7 +2242,7 @@ class VectraClientV2_2(VectraClientV2_1):
         :param note_id: ID of the note to delete
         """
 
-        return self._request(method='delete', url='{url}/hosts/{host_id}/notes/{note_id}'.format(url=self.url, host_id=host_id, note_id=note_id))
+        return self._request(method='delete', url=f'{self.url}/hosts/{host_id}/notes/{note_id}')
 
     def get_detection_note(self, detection_id=None):
         """
@@ -2252,7 +2252,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not detection_id:
             raise ValueError('detection id required')
 
-        return self._request(method='get', url='{url}/detections/{id}/notes'.format(url=self.url, id=detection_id))
+        return self._request(method='get', url=f'{self.url}/detections/{detection_id}/notes')
 
     def set_detection_note(self, detection_id=None, note=''):
         """
@@ -2267,7 +2267,7 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='post', url='{url}/detections/{id}/notes'.format(url=self.url, id=detection_id), json=payload)
+        return self._request(method='post', url=f'{self.url}/detections/{detection_id}/notes', json=payload)
 
     def update_detection_note(self, detection_id=None, note_id=None, note=''):
         """
@@ -2283,7 +2283,7 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='patch', url='{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/detections/{detection_id}/notes/{note_id}', json=payload)
     
     def delete_detection_note(self, detection_id=None, note_id=None):
         """
@@ -2292,7 +2292,7 @@ class VectraClientV2_2(VectraClientV2_1):
         :param note_id: ID of the note to delete
         """
 
-        return self._request(method='delete', url='{url}/detections/{detection_id}/notes/{note_id}'.format(url=self.url, detection_id=detection_id, note_id=note_id))
+        return self._request(method='delete', url=f'{self.url}/detections/{detection_id}/notes/{note_id}')
 
     def get_account_note(self, account_id=None):
         """
@@ -2302,7 +2302,7 @@ class VectraClientV2_2(VectraClientV2_1):
         if not account_id:
             raise ValueError('account id required')
 
-        return self._request(method='get', url='{url}/accounts/{id}/notes'.format(url=self.url, id=account_id))
+        return self._request(method='get', url=f'{self.url}/accounts/{account_id}/notes')
 
     def set_account_note(self, account_id=None, note=''):
         """
@@ -2317,7 +2317,7 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='post', url='{url}/accounts/{id}/notes'.format(url=self.url, id=account_id), json=payload)
+        return self._request(method='post', url=f'{self.url}/accounts/{account_id}/notes', json=payload)
 
     def update_account_note(self, account_id=None, note_id=None, note=''):
         """
@@ -2333,7 +2333,7 @@ class VectraClientV2_2(VectraClientV2_1):
         else:
             raise TypeError('Note must be of type str')
 
-        return self._request(method='patch', url='{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id), json=payload)
+        return self._request(method='patch', url=f'{self.url}/accounts/{account_id}/notes/{note_id}', json=payload)
     
     def delete_account_note(self, account_id=None, note_id=None):
         """
@@ -2342,7 +2342,7 @@ class VectraClientV2_2(VectraClientV2_1):
         :param note_id: ID of the note to delete
         """
 
-        return self._request(method='delete', url='{url}/accounts/{account_id}/notes/{note_id}'.format(url=self.url, account_id=account_id, note_id=note_id))
+        return self._request(method='delete', url=f'{self.url}/accounts/{account_id}/notes/{note_id}')
 
     def get_all_assignments(self, **kwargs):
         """
@@ -2355,7 +2355,7 @@ class VectraClientV2_2(VectraClientV2_1):
         :param resolution: filter by resolution (int)
         :param resolved: filters by resolved status (bool)
         """
-        resp = self._request(method='get', url='{url}/assignments'.format(url=self.url), params=self._generate_assignment_params(kwargs))
+        resp = self._request(method='get', url=f'{self.url}/assignments', params=self._generate_assignment_params(kwargs))
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -2371,7 +2371,7 @@ class VectraClientV2_2(VectraClientV2_1):
             'assign_account_id': assign_account_id,
             'assign_to_user_id': assign_to_user_id
         }
-        return self._request(method='post', url='{url}/assignments'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/assignments', json=payload)
 
     def create_host_assignment(self, assign_host_id, assign_to_user_id):
         """
@@ -2383,7 +2383,7 @@ class VectraClientV2_2(VectraClientV2_1):
             'assign_host_id': assign_host_id,
             'assign_to_user_id': assign_to_user_id
         }
-        return self._request(method='post', url='{url}/assignments'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/assignments', json=payload)
 
     def update_assignment(self, assignment_id, assign_to_user_id):
         """
@@ -2394,14 +2394,14 @@ class VectraClientV2_2(VectraClientV2_1):
         payload = {
             'assign_to_user_id': assign_to_user_id
         }
-        return self._request(method='put', url='{url}/assignments/{id}'.format(url=self.url, id=assignment_id), json=payload)
+        return self._request(method='put', url=f'{self.url}/assignments/{assignment_id}', json=payload)
 
     def delete_assignment(self, assignment_id):
         """
         Delete assignment
         :param assignment_id: assignment ID
         """
-        return self._request(method='delete', url='{url}/assignments/{id}'.format(url=self.url, id=assignment_id))
+        return self._request(method='delete', url=f'{self.url}/assignments/{assignment_id}')
     
     def set_assignment_resolved(self, assignment_id:int, detection_ids:list, outcome:int, note:str, mark_as_fixed:bool =  None, triage_as:str = None):
         """
@@ -2425,14 +2425,14 @@ class VectraClientV2_2(VectraClientV2_1):
             "triage_as": triage_as,
             "detection_ids": detection_ids
             }
-        return self._request(method='put', url='{url}/assignments/{id}/resolve'.format(url=self.url, id=assignment_id), json=payload)
+        return self._request(method='put', url=f'{self.url}/assignments/{assignment_id}/resolve', json=payload)
 
     def get_all_assignment_outcomes(self, **kwargs):
         """
         Get the outcome of a given assignment
         :param : 
         """
-        resp = self._request(method='get', url='{url}/assignment_outcomes'.format(url=self.url))
+        resp = self._request(method='get', url=f'{self.url}/assignment_outcomes')
         yield resp
         while resp.json()['next']:
             resp = self._request(method='get', url=resp.json()['next'])
@@ -2443,7 +2443,7 @@ class VectraClientV2_2(VectraClientV2_1):
         Describe an existing Assignment Outcome
         :param assignment_outcome_id: ID of the Assignment Outcome you want details for.
         """
-        return self._request(method='get', url='{url}/assignment_outcomes/{id}'.format(url=self.url, id=assignment_outcome_id))
+        return self._request(method='get', url=f'{self.url}/assignment_outcomes/{assignment_outcome_id}')
 
     def create_assignment_outcome(self, title:str, category:str):
         """
@@ -2458,7 +2458,7 @@ class VectraClientV2_2(VectraClientV2_1):
             "title": title,
             "category": category
         }
-        return self._request(method='post', url='{url}/assignment_outcomes'.format(url=self.url), json=payload)
+        return self._request(method='post', url=f'{self.url}/assignment_outcomes', json=payload)
 
     def update_assignment_outcome(self, outcome_id:int, title:str, category:str):
         """
@@ -2474,21 +2474,21 @@ class VectraClientV2_2(VectraClientV2_1):
             "title": title,
             "category": category
         }
-        return self._request(method='put', url='{url}/assignment_outcomes/{id}'.format(url=self.url, id=outcome_id), json=payload)
+        return self._request(method='put', url=f'{self.url}/assignment_outcomes/{outcome_id}', json=payload)
     
     def delete_assignment_outcome(self, outcome_id:int):
         """
         Delete an existing custom Assignment Outcome
         :param outcome_id: ID of the Assignment Outcome to delete
         """
-        return self._request(method='delete', url='{url}/assignment_outcomes/{id}'.format(url=self.url, id=outcome_id))
+        return self._request(method='delete', url=f'{self.url}/assignment_outcomes/{outcome_id}')
     
     def get_sensor_registration_token(self):
         """
         Get the existing sensor registration token.
         If no valid token has been created yet, this will return an empty JSON
         """
-        response =  self._request(method='get', url='{url}/sensor_token'.format(url=self.url))
+        response =  self._request(method='get', url=f'{self.url}/sensor_token')
         # GET returns an empty response of no valid token is found, but we want JSON
         if len(response.content) < 1:
             json_dict = {}
@@ -2500,19 +2500,19 @@ class VectraClientV2_2(VectraClientV2_1):
         Create a new sensor registration token. 
         The token will be valid for 24 hours.
         """
-        return self._request(method='post', url='{url}/sensor_token'.format(url=self.url))
+        return self._request(method='post', url=f'{self.url}/sensor_token')
     
     def delete_sensor_registration_token(self):
         """
         Delete the existing sensor registration token
         """
-        return self._request(method='delete', url='{url}/sensor_token'.format(url=self.url))
+        return self._request(method='delete', url=f'{self.url}/sensor_token')
     
     def get_aws_external_connectors(self):
         """
         Get the configured external connectors for AWS.
         """
-        return self._request(method='get', url='{url}/settings/aws_connectors'.format(url=self.url))
+        return self._request(method='get', url=f'{self.url}/settings/aws_connectors')
     
     def create_aws_external_connector(self, access_key:str, alias:str, secret_key:str, role_to_assume:str, account_type:str):
         """
@@ -2531,4 +2531,4 @@ class VectraClientV2_2(VectraClientV2_1):
             "role_to_assume": role_to_assume, 
             "account_type": account_type
         }
-        return self._request(method='post', url='{url}/settings/aws_connectors'.format(url=self.url),json=payload)
+        return self._request(method='post', url=f'{self.url}/settings/aws_connectors',json=payload)
