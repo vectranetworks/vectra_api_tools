@@ -5,6 +5,8 @@ import html
 import re
 import copy
 import ipaddress
+from time import sleep
+from requests.auth import HTTPBasicAuth
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
@@ -61,6 +63,29 @@ def validate_api_v2(func):
             raise NotImplementedError('Method only accessible via v2 of API')
 
     return api_validator
+
+def renew_access_token(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except HTTPUnauthorizedException:
+            # Invoke the code responsible for get a new token.
+            self._refresh_oauth_token()
+            # Once the token is refreshed, we can retry the operation.
+            return func(self, *args, **kwargs)
+        except HTTPTooManyRequestsException:
+            sleep(1)
+            return func(self, *args, **kwargs)
+    return wrapper
+
+def aws_cognito_timeout(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except HTTPTooManyRequestsException:
+            sleep(15)
+            return func(self, *args, **kwargs)
+    return wrapper
 
 def deprecation(message):
     warnings.warn(message, PendingDeprecationWarning)
@@ -2532,3 +2557,282 @@ class VectraClientV2_2(VectraClientV2_1):
             "account_type": account_type
         }
         return self._request(method='post', url=f'{self.url}/settings/aws_connectors',json=payload)
+
+
+class VectraClientV3(VectraClientV2_2):
+
+    def __init__(self, url=None, client_id=None, client_secret=None, verify=False):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        # Remove potential trailing slash
+        url = self._remove_trailing_slashes(url)
+        # Set endpoint to APIv3
+        self.url = f'{url}/api/v3'
+        self.base_url = url
+        self.version = 3
+        self.verify = verify
+        self.client_id = client_id
+        self.client_secret = client_secret
+        # Get the OAuth2 token
+        r_dict = self._get_oauth_token(url, client_id, client_secret).json()
+        access_token = r_dict.get('access_token')
+        # Save the refresh token
+        self.refresh_token = r_dict.get('refresh_token')
+        # Setup authorization in headers
+        self.headers = {
+                'Authorization': "Bearer " + access_token,
+                'Content-Type': "application/json",
+                'Cache-Control': "no-cache"
+            }
+
+    @staticmethod
+    @aws_cognito_timeout
+    @request_error_handler
+    def _get_oauth_token(base_url, client_id, client_secret, verify=False):
+        data = {
+            'grant_type': 'client_credentials'
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = f'{base_url}/oauth2/token'
+        return requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(client_id, client_secret), verify=verify)
+
+    @aws_cognito_timeout
+    @request_error_handler
+    def _refresh_oauth_token_request(self):
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': self.refresh_token
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = f'{self.base_url}/oauth2/token'
+        return requests.post(url, headers=headers, data=data, verify=self.verify)
+    
+    def _refresh_oauth_token(self):
+        r = self._refresh_oauth_token_request()
+        token = r.json().get('access_token')
+        self.headers['Authorization'] = "Bearer " + token
+
+    @renew_access_token
+    @request_error_handler
+    def _request(self, method, url, **kwargs):
+        """ 
+        Do a get request on the provided URL
+        This is used by paginated endpoints
+        :rtype: requests.Response
+        """
+        if method not in ['get', 'patch', 'put', 'post', 'delete']:
+            raise ValueError('Invalid requests method provided')
+        
+        if 'headers' in kwargs.keys():
+            headers=kwargs.pop('headers')
+        else:
+            headers=self.headers
+
+        if self.version >= 2:
+            return requests.request(method=method, url=url, headers=headers, verify=self.verify, **kwargs)
+        else:
+            return requests.request(method=method, url=url, auth=self.auth, verify=self.verify, **kwargs)        
+
+    def get_account_scoring_events(self, **kwargs):
+        """
+        Get the latest account scoring events
+        :param from: min account scoring event ID, default=0
+        :account_uid: account UID for which to retrieve the events (defaul all accounts)
+        :event_timestamp_gte: min timestamp of the earliest event to return
+        :include_score_decreases: include also account score decrease events, default False (bool)
+        :limit: number of events to return, max=1000, default=500 (uint)
+        """
+        valid_keys = ['from', 'since', 'account_uid', 'event_timestamp_gte', 'include_score_decreases', 'limit']
+        deprecated_keys = ['since']
+
+        params = {}
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                if v is not None: params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
+            if k in deprecated_keys: param_deprecation(k)
+    
+        resp = self._request(method='get', url=f'{self.url}/events/account_scoring', **params)
+        yield resp
+        while resp.json()['remaining_count'] > 0:
+            resp = self._request(method='get', url=f'{self.url}/events/account_scoring', since=resp.json()['next_checkpoint'])
+            yield resp
+        
+    def get_account_detection_events(self, **kwargs):
+        """
+        Get the latest account detections
+        :param from: min account detection ID, default=0
+        :include_info_category: include INFO category detections (bool)
+        :include_triaged: include triaged detections (bool)
+        :account_uid: account ID to get detections from (defaul all)
+        :event_timestamp_gte: min timestamp of the earliest event to return
+        :detection_id: get only events for a specific detection id
+        :limit: number of events to return, max=1000, default=500 (uint)
+        """
+
+        valid_keys = ['from', 'since', 'include_info_category', 'include_triaged', 'account_uid', 
+            'event_timestamp_gte', 'detection_id', 'limit']
+        deprecated_keys = ['since']
+        
+        params = {}
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                if v is not None: params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
+            if k in deprecated_keys: param_deprecation(k)
+
+        resp = self._request(method='get', url=f'{self.url}/events/account_detection', **params)
+        yield resp
+        while resp.json()['remaining_count'] > 0:
+            resp = self._request(method='get', url=f'{self.url}/events/account_detection', since=resp.json()['next_checkpoint'])
+            yield resp
+
+    def bulk_delete_hosts_tag(self):
+        raise NotImplementedError
+
+    def bulk_set_hosts_tag(self):
+        raise NotImplementedError
+
+    def create_feed(self):
+        raise NotImplementedError
+
+    def create_group(self):
+        raise NotImplementedError
+
+    def delete_feed(self):
+        raise NotImplementedError
+
+    def delete_group(self):
+        raise NotImplementedError
+
+    def delete_host_note(self):
+        raise NotImplementedError
+
+    def delete_proxy(self):
+        raise NotImplementedError
+
+    def get_all_campaigns(self):
+        raise NotImplementedError
+
+    def get_all_groups(self):
+        raise NotImplementedError
+
+    def get_all_hosts(self):
+        raise NotImplementedError
+
+    def get_all_sensor_subnets(self):
+        raise NotImplementedError
+
+    def get_all_sensor_traffic_stats(self):
+        raise NotImplementedError
+
+    def get_all_subnets(self):
+        raise NotImplementedError
+
+    def get_all_traffic_stats(self):
+        raise NotImplementedError
+
+    def get_all_users(self):
+        raise NotImplementedError
+
+    def get_audits(self):
+        raise NotImplementedError
+
+    def get_campaign_by_id(self):
+        raise NotImplementedError
+
+    def get_campaigns(self):
+        raise NotImplementedError
+
+    def get_detect_usage(self):
+        raise NotImplementedError
+
+    def get_detection_pcap(self):
+        raise NotImplementedError
+
+    def get_feed_by_name(self):
+        raise NotImplementedError
+
+    def get_feeds(self):
+        raise NotImplementedError
+
+    def get_group_by_id(self):
+        raise NotImplementedError
+
+    def get_groups(self):
+        raise NotImplementedError
+
+    def get_groups_by_name(self):
+        raise NotImplementedError
+
+    def get_health_check(self):
+        raise NotImplementedError
+
+    def get_host_by_id(self):
+        raise NotImplementedError
+
+    def get_host_note(self):
+        raise NotImplementedError
+
+    def get_host_tags(self):
+        raise NotImplementedError
+
+    def get_hosts(self):
+        raise NotImplementedError
+
+    def get_internal_networks(self):
+        raise NotImplementedError
+
+    def get_ip_addresses(self):
+        raise NotImplementedError
+
+    def get_locked_accounts(self):
+        raise NotImplementedError
+
+    def get_proxies(self):
+        raise NotImplementedError
+
+    def get_proxy_by_id(self):
+        raise NotImplementedError
+
+    def get_user_by_id(self):
+        raise NotImplementedError
+
+    def post_stix_file(self):
+        raise NotImplementedError
+
+    def set_host_note(self):
+        raise NotImplementedError
+
+    def set_host_tags(self):
+        raise NotImplementedError
+
+    def set_internal_networks(self):
+        raise NotImplementedError
+
+    def set_key_asset(self):
+        raise NotImplementedError
+
+    def update_group(self):
+        raise NotImplementedError
+
+    def update_host_note(self):
+        raise NotImplementedError
+
+    def update_proxy(self):
+        raise NotImplementedError
+
+    def update_user(self):
+        raise NotImplementedError
