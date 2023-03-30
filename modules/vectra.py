@@ -27,9 +27,8 @@ class HTTPException(Exception):
                 detail = response.content
         except Exception: 
             detail = response.content
-        self.message = 'Status code: {code} - {detail}'.format(code=str(response.status_code), detail=detail)
-        self.status_code = response.status_code
-        super().__init__(self.message)
+        body = f'Status code: {str(response.status_code)} - {detail}'
+        super().__init__(body)
 
 
 class HTTPUnauthorizedException(HTTPException):
@@ -1791,7 +1790,7 @@ class VectraClientV2_1(VectraClient):
             tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
             last_detection_timestamp, detection_set, probable_home
         """
-        raise DeprecationWarning('Thismethod no longer functions correctly, please use API > v2.2')
+        raise DeprecationWarning('This method is deprecated. Use API Version > 2.2')
 
     def get_account_tags(self, account_id=None):
         """
