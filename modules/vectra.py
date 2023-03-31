@@ -2697,9 +2697,17 @@ class VectraClientV2_4(VectraClientV2_2):
         """
         return self._request(method='delete', url=f'{self.url}/groups/{group_id}')
 
-class VectraClientV3(VectraClientV2_2):
+
+class VectraClientV3(VectraClientV2_4):
 
     def __init__(self, url=None, client_id=None, client_secret=None, verify=False):
+        """
+        Initialize Vectra SaaS API client
+        :param url: hostname of Vectra brain (ex https://www.example.com) - required
+        :param client_id: Client ID for authentication when using API v3*
+        :param client_secret: Client Secret for authentication
+        :param verify: Verify SSL (default: False) - optional
+        """
         # Remove potential trailing slash
         url = self._remove_trailing_slashes(url)
         # Set endpoint to APIv3
