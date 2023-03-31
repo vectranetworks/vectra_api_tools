@@ -42,6 +42,7 @@ class HTTPTooManyRequestsException(HTTPException):
      def __init__(self, response):
         super().__init__(response)
 
+
 def request_error_handler(func):
         def request_handler(self, *args, **kwargs):
             response = func(self, *args, **kwargs)
@@ -91,7 +92,7 @@ def deprecation(message):
     warnings.warn(message, PendingDeprecationWarning)
 
 def param_deprecation(key):
-    message = '{0} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'.format(key)
+    message = f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'
     warnings.warn(message, PendingDeprecationWarning)
 
 
@@ -2559,15 +2560,146 @@ class VectraClientV2_2(VectraClientV2_1):
         return self._request(method='post', url=f'{self.url}/settings/aws_connectors',json=payload)
 
 
-class VectraClientV3(VectraClientV2_2):
+class VectraClientV2_4(VectraClientV2_2):
 
-    def __init__(self, url=None, client_id=None, client_secret=None, verify=False):
+    def __init__(self, url=None, token=None, verify=False):
         """
         Initialize Vectra client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
         :param token: API token for authentication when using API v2*
         :param verify: Verify SSL (default: False) - optional
         """
+        super().__init__(url=url, token=token, verify=verify)
+        # Remove potential trailing slash
+        url = VectraClient._remove_trailing_slashes(url)
+        self.url = f'{url}/api/v2.4'
+        self.version = 2.4
+
+    @staticmethod
+    def _generate_group_params(args):
+        """
+        Generate query parameters for groups based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        params = {}
+        valid_keys = ['account_ids', 'account_names','description', 'domains', 'host_ids', 'host_names', 'importance', 
+                      'ips', 'last_modified_by', 'last_modified_timestamp', 'name', 'page', 'page_size', 'type']
+        for k, v in args.items():
+            if k in valid_keys:
+                if v is not None: 
+                    if k == 'importance' and v not in ["high", "medium", "low", "never_prioritize"]:
+                        raise ValueError('importance is an invalid value, must be in ["high", "medium", "low", or "never_prioritize"]')
+                    else:
+                        params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid group query parameter')
+        return params
+
+    def get_all_groups(self, **kwargs):
+        """
+        Generator to retrieve all groups - all parameters are optional
+        :param account_ids: search for groups containing those account IDs (list)
+        :param account_names: search for groups containing those account names (list)
+        :param description: description of groups to search
+        :param domains: search for groups containing those domains (list)
+        :param host_ids: search for groups containing those host IDs (list)
+        :param host_names: search for groups containing those hosts (list)
+        :param importance: search for groups of this specific importance (One of "high", "medium", "low", or "never_prioritize")
+        :param ips: search for groups containing those IPs (list)
+        :param last_modified_by: username of last person to modify this group
+        :param last_modified_timestamp: timestamp of last modification of group (datetime)
+        :param name: name of groups to search
+        :param page: page number to return (int) TODO check
+        :param page_size: number of object to return in repsonse (int) TODO check
+        :param type: type of group to search (domain/host/ip)
+        """
+        resp = self._request(method='get', url=f'{self.url}/groups', params=self._generate_group_params(kwargs))
+        yield resp
+        while resp.json()['next']:
+            resp = self._request(method='get', url=resp.json()['next'])
+            yield resp
+
+    def create_group(self, name=None, description='', type=None, members=[]):
+        """
+        Create group
+        :param name: name of the group to create
+        :param description: description of the group
+        :param type: type of the group to create (account/domain/host/ip)
+        :param members: list of host ids to add to group
+        :rtype requests.Response:
+        """
+        if not name:
+            raise ValueError("missing required parameter: name")
+        if not type:
+            raise ValueError("missing required parameter: type")
+        if type not in ['account', 'host', 'domain', 'ip']:
+            raise ValueError('parameter type must have value "domain", "ip" or "host"')
+        if not isinstance(members, list):
+            raise TypeError("members must be type: list")
+
+        payload = {
+            "name": name,
+            "description": description,
+            "type": type,
+            "members": members
+        }
+        return self._request(method='post', url=f'{self.url}/groups', json=payload)
+
+    def update_group(self, group_id, name=None, description='', members=[], append=False):
+        """
+        Update group
+        :param group_id: id of group to update
+        :param name: name of group
+        :param description: description of the group
+        :param members: list of members to add to group
+        :param rules: list of rule ids to add to group
+        :param append: set to True if appending to existing list (boolean)
+        """
+        if not isinstance(members, list):
+            raise TypeError("members must be type: list")
+        
+        group = self.get_group_by_id(group_id = group_id).json()
+        try:
+            id = group['id']
+        except KeyError:
+            raise KeyError(f'Group with id {str(group_id)} was not found')
+
+        # Transform existing members into flat list as API returns dicts for host & account groups
+        if append:
+            if group['type'] == 'host':
+                for member in group['members']:
+                    members.append(member['id'])
+            elif group['type'] == 'account':
+                for member in group['members']:
+                    members.append(member['uid'])
+            else:
+                for member in group['members']:
+                    members.append(member['id'])
+        # Ensure members are unique
+        members = list(set(members))
+
+        name = name if name else group['name']
+        description = description if description else group['description']
+
+        payload = {
+            "name": name,
+            "description": description,
+            "members": members
+        }
+        return self._request(method='patch', url=f'{self.url}/groups/{id}', json=payload)
+
+    def delete_group(self, group_id=None):
+        """
+        Delete group
+        :param group_id:
+        detections
+        """
+        return self._request(method='delete', url=f'{self.url}/groups/{group_id}')
+
+class VectraClientV3(VectraClientV2_2):
+
+    def __init__(self, url=None, client_id=None, client_secret=None, verify=False):
         # Remove potential trailing slash
         url = self._remove_trailing_slashes(url)
         # Set endpoint to APIv3
