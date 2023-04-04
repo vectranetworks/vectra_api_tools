@@ -5,6 +5,9 @@ import html
 import re
 import copy
 import ipaddress
+from time import sleep, time
+from requests.auth import HTTPBasicAuth
+
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
@@ -40,7 +43,6 @@ class HTTPTooManyRequestsException(HTTPException):
      def __init__(self, response):
         super().__init__(response)
 
-
 def request_error_handler(func):
         def request_handler(self, *args, **kwargs):
             response = func(self, *args, **kwargs)
@@ -54,22 +56,35 @@ def request_error_handler(func):
                 raise HTTPException(response)
         return request_handler
 
-def validate_api_v2(func):
-    def api_validator(self, *args, **kwargs):
-        if self.version >= 2:
+def renew_access_token(func):
+    def wrapper(self, *args, **kwargs):
+        try:
             return func(self, *args, **kwargs)
-        else:
-            raise NotImplementedError('Method only accessible via v2 of API')
-
-    return api_validator
-
-def deprecation(message):
-    warnings.warn(message, PendingDeprecationWarning)
-
-def param_deprecation(key):
-    message = f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'
-    warnings.warn(message, PendingDeprecationWarning)
-
+        except HTTPUnauthorizedException as e:
+            # To calculate token expiration we take 10s margin
+            if not self.refresh_token or (self.access_token_validity-time() > 10.0 and self.refresh_token_validity-time()>10.0):
+                raise
+            elif self.refresh_token_validity-time()< 10.0:
+                self._get_oauth_token()
+                # Once the token is refreshed, we can retry the operation.
+                return func(self, *args, **kwargs)
+            else:
+                self._refresh_oauth_token() # This resets the validity, so we don't retry indefinitely
+                # Once the token is refreshed, we can retry the operation.
+                return func(self, *args, **kwargs)
+        except HTTPTooManyRequestsException:
+            sleep(1)
+            return func(self, *args, **kwargs)
+    return wrapper
+    
+def aws_cognito_timeout(func):
+    def wrapper(self, *args, **kwargs):
+        try:
+            return func(self, *args, **kwargs)
+        except HTTPTooManyRequestsException:
+            sleep(15)
+            return func(self, *args, **kwargs)
+    return wrapper
 
 class VectraClient(object):
 
@@ -99,11 +114,30 @@ class VectraClient(object):
         elif user and password:
             self.url = f'{url}/api'
             self.auth = (user, password)
-            deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
+            VectraClient.deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
                         ' when possible')
         else:
             raise RuntimeError("At least one form of authentication is required. Please provide a token or username"
                                " and password")
+    
+    @staticmethod
+    def validate_api_v2(func):
+        def api_validator(self, *args, **kwargs):
+            if self.version >= 2:
+                return func(self, *args, **kwargs)
+            else:
+                raise NotImplementedError('Method only accessible via v2 of API')
+
+        return api_validator
+
+    @staticmethod
+    def deprecation(message):
+        warnings.warn(message, PendingDeprecationWarning)
+
+    @staticmethod
+    def param_deprecation(key):
+        message = f'{key} will be deprecated with Vectra API v1 which will be annouced in an upcoming release'
+        warnings.warn(message, PendingDeprecationWarning)
 
     @staticmethod
     def _remove_trailing_slashes(url):
@@ -167,7 +201,7 @@ class VectraClient(object):
                 if v is not None: params[k] = v
             else:
                 raise ValueError(f'argument {str(k)} is an invalid campaign query parameter')
-            if k in deprecated_keys: param_deprecation(k)
+            if k in deprecated_keys: VectraClient.VectraClient.param_deprecation(k)
         return params
 
     @staticmethod
@@ -205,7 +239,7 @@ class VectraClient(object):
                 if v is not None: params[k] = v
             else:
                 raise ValueError(f'argument {str(k)} is an invalid detection query parameter')
-            if k in deprecated_keys: param_deprecation(k)
+            if k in deprecated_keys: VectraClient.param_deprecation(k)
         return params
 
     @staticmethod
@@ -946,12 +980,12 @@ class VectraClient(object):
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
-        deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
+        VectraClient.deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
         if name:
-            deprecation('The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
+            VectraClient.deprecation('The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
             return self.get_rules_by_name(triage_category=name)
         elif rule_id:
-            deprecation('The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function')
+            VectraClient.deprecation('The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function')
             return self.get_rule_by_id(rule_id)
         else:
             return self._request(method='get', url=f'{self.url}/rules', params=self._generate_rule_params(kwargs))
@@ -972,7 +1006,7 @@ class VectraClient(object):
         if not rule_id:
             raise ValueError('Rule id required')
 
-        deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
+        VectraClient.deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
 
         return self._request(method='get', url=f'{self.url}/rules/{rule_id}', params=self._generate_rule_by_id_params(kwargs))
 
@@ -1124,7 +1158,7 @@ class VectraClient(object):
         """
 
         if name:
-            deprecation('The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
+            VectraClient.deprecation('The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter')
             matching_rules = self.get_rules_by_name(triage_category=name)
             if len(matching_rules) > 1:
                 raise Exception('More than one rule matching the name')
@@ -1384,7 +1418,7 @@ class VectraClient(object):
         Get all defined proxies
         """
         if proxy_id:
-            deprecation('The "proxy_id" argument will be removed from this function, please use the get_proxy_by_id() function')
+            VectraClient.deprecation('The "proxy_id" argument will be removed from this function, please use the get_proxy_by_id() function')
             return self.get_proxy_by_id(proxy_id=proxy_id)
         else:
             return self._request(method='get', url=f'{self.url}/proxies')
@@ -1837,7 +1871,6 @@ class VectraClientV2_1(VectraClient):
         }
         return self._request(method='post', url=f'{self.url}/tagging/account', json=payload)
 
-    @request_error_handler
     def bulk_delete_accounts_tag(self, tag, account_ids):
         """
         Delete a tag in bulk on multiple accounts. Only one tag can be deleted at a time
@@ -2609,6 +2642,8 @@ class VectraClientV2_4(VectraClientV2_2):
             raise ValueError("missing required parameter: type")
         if type not in ['account', 'host', 'domain', 'ip']:
             raise ValueError('parameter type must have value "domain", "ip" or "host"')
+        #if importance and importance not in  ['high', 'medium', 'low', 'never_prioritize']:
+        #    raise ValueError('importance must be one of "high", "medium", "low", or "never_prioritize"')
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
 
@@ -2670,3 +2705,291 @@ class VectraClientV2_4(VectraClientV2_2):
         detections
         """
         return self._request(method='delete', url=f'{self.url}/groups/{group_id}')
+
+
+class VectraClientV3(VectraClientV2_4):
+
+    def __init__(self, url=None, client_id=None, client_secret=None, verify=False):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        # Remove potential trailing slash
+        url = self._remove_trailing_slashes(url)
+        # Set endpoint to APIv3
+        self.url = f'{url}/api/v3'
+        self.base_url = url
+        self.version = 3
+        self.verify = verify
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.access_token = None
+        self.refresh_token = None
+        self.access_token_validity = None
+        self.refresh_token_validity = None
+        # Setup authorization in headers
+        self.headers = {
+                'Authorization': "",
+                'Content-Type': "application/json",
+                'Cache-Control': "no-cache"
+            }
+
+    @aws_cognito_timeout
+    @request_error_handler
+    def _get_oauth_token_request(self):
+        data = {
+            'grant_type': 'client_credentials'
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = f'{self.base_url}/oauth2/token'
+        return requests.post(url, headers=headers, data=data, auth=HTTPBasicAuth(self.client_id, self.client_secret), verify=self.verify)
+    
+    def _get_oauth_token(self):
+        # Get the OAuth2 token
+        r_dict = self._get_oauth_token_request().json()
+        self.access_token = r_dict.get('access_token')
+        # Save the refresh token
+        self.refresh_token = r_dict.get('refresh_token')
+        self.access_token_validity = time()+r_dict.get('expires_in')
+        self.refresh_token_validity = time()+r_dict.get('refresh_expires_in')
+        self.headers['Authorization'] = "Bearer " + self.access_token
+
+    @aws_cognito_timeout
+    @request_error_handler
+    def _refresh_oauth_token_request(self):
+        data = {
+            'grant_type': 'refresh_token',
+            'refresh_token': self.refresh_token
+            }
+        headers = {
+            'Content-Type': "application/x-www-form-urlencoded",
+            'Accept': "application/json"
+            }
+        url = f'{self.base_url}/oauth2/token'
+        return requests.post(url, headers=headers, data=data, verify=self.verify)
+    
+    def _refresh_oauth_token(self):
+        r_dict = self._refresh_oauth_token_request().json()
+        token = r_dict.get('access_token')
+        self.access_token_validity = time()+r_dict.get('expires_in')
+        self.headers['Authorization'] = "Bearer " + token
+
+    @renew_access_token
+    @request_error_handler
+    def _request(self, method, url, **kwargs):
+        """ 
+        Do a get request on the provided URL
+        This is used by paginated endpoints
+        :rtype: requests.Response
+        """
+        if method not in ['get', 'patch', 'put', 'post', 'delete']:
+            raise ValueError('Invalid requests method provided')
+        
+        if not self.access_token:
+            # Get the OAuth2 token
+            self._get_oauth_token()
+                
+        if 'headers' in kwargs.keys():
+            headers=kwargs.pop('headers')
+        else:
+            headers=self.headers
+        return requests.request(method=method, url=url, headers=headers, verify=self.verify, **kwargs)
+
+    def get_account_scoring_events(self, **kwargs):
+        """
+        Get the latest account scoring events
+        :param from: min account scoring event ID, default=0
+        :account_uid: account UID for which to retrieve the events (defaul all accounts)
+        :event_timestamp_gte: min timestamp of the earliest event to return
+        :include_score_decreases: include also account score decrease events, default False (bool)
+        :limit: number of events to return, max=1000, default=500 (uint)
+        """
+        valid_keys = ['from', 'since', 'account_uid', 'event_timestamp_gte', 'include_score_decreases', 'limit']
+        deprecated_keys = ['since']
+
+        params = {}
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                if v is not None: params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid account scoring query parameter')
+            if k in deprecated_keys: VectraClient.param_deprecation(k)
+    
+        resp = self._request(method='get', url=f'{self.url}/events/account_scoring', **params)
+        yield resp
+        while resp.json()['remaining_count'] > 0:
+            resp = self._request(method='get', url=f'{self.url}/events/account_scoring', since=resp.json()['next_checkpoint'])
+            yield resp
+        
+    def get_account_detection_events(self, **kwargs):
+        """
+        Get the latest account detections
+        :param from: min account detection ID, default=0
+        :include_info_category: include INFO category detections (bool)
+        :include_triaged: include triaged detections (bool)
+        :account_uid: account ID to get detections from (defaul all)
+        :event_timestamp_gte: min timestamp of the earliest event to return
+        :detection_id: get only events for a specific detection id
+        :limit: number of events to return, max=1000, default=500 (uint)
+        """
+
+        valid_keys = ['from', 'since', 'include_info_category', 'include_triaged', 'account_uid', 
+            'event_timestamp_gte', 'detection_id', 'limit']
+        deprecated_keys = ['since']
+        
+        params = {}
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                if v is not None: params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid account detection query parameter')
+            if k in deprecated_keys: VectraClient.param_deprecation(k)
+
+        resp = self._request(method='get', url=f'{self.url}/events/account_detection', **params)
+        yield resp
+        while resp.json()['remaining_count'] > 0:
+            resp = self._request(method='get', url=f'{self.url}/events/account_detection', since=resp.json()['next_checkpoint'])
+            yield resp
+
+    def bulk_delete_hosts_tag(self):
+        raise NotImplementedError
+
+    def bulk_set_hosts_tag(self):
+        raise NotImplementedError
+
+    def create_feed(self):
+        raise NotImplementedError
+
+    def create_group(self):
+        raise NotImplementedError
+
+    def delete_feed(self):
+        raise NotImplementedError
+
+    def delete_group(self):
+        raise NotImplementedError
+
+    def delete_host_note(self):
+        raise NotImplementedError
+
+    def delete_proxy(self):
+        raise NotImplementedError
+
+    def get_all_campaigns(self):
+        raise NotImplementedError
+
+    def get_all_groups(self):
+        raise NotImplementedError
+
+    def get_all_hosts(self):
+        raise NotImplementedError
+
+    def get_all_sensor_subnets(self):
+        raise NotImplementedError
+
+    def get_all_sensor_traffic_stats(self):
+        raise NotImplementedError
+
+    def get_all_subnets(self):
+        raise NotImplementedError
+
+    def get_all_traffic_stats(self):
+        raise NotImplementedError
+
+    def get_all_users(self):
+        raise NotImplementedError
+
+    def get_audits(self):
+        raise NotImplementedError
+
+    def get_campaign_by_id(self):
+        raise NotImplementedError
+
+    def get_campaigns(self):
+        raise NotImplementedError
+
+    def get_detect_usage(self):
+        raise NotImplementedError
+
+    def get_detection_pcap(self):
+        raise NotImplementedError
+
+    def get_feed_by_name(self):
+        raise NotImplementedError
+
+    def get_feeds(self):
+        raise NotImplementedError
+
+    def get_group_by_id(self):
+        raise NotImplementedError
+
+    def get_groups(self):
+        raise NotImplementedError
+
+    def get_groups_by_name(self):
+        raise NotImplementedError
+
+    def get_health_check(self):
+        raise NotImplementedError
+
+    def get_host_by_id(self):
+        raise NotImplementedError
+
+    def get_host_note(self):
+        raise NotImplementedError
+
+    def get_host_tags(self):
+        raise NotImplementedError
+
+    def get_hosts(self):
+        raise NotImplementedError
+
+    def get_internal_networks(self):
+        raise NotImplementedError
+
+    def get_ip_addresses(self):
+        raise NotImplementedError
+
+    def get_locked_accounts(self):
+        raise NotImplementedError
+
+    def get_proxies(self):
+        raise NotImplementedError
+
+    def get_proxy_by_id(self):
+        raise NotImplementedError
+
+    def get_user_by_id(self):
+        raise NotImplementedError
+
+    def post_stix_file(self):
+        raise NotImplementedError
+
+    def set_host_note(self):
+        raise NotImplementedError
+
+    def set_host_tags(self):
+        raise NotImplementedError
+
+    def set_internal_networks(self):
+        raise NotImplementedError
+
+    def set_key_asset(self):
+        raise NotImplementedError
+
+    def update_group(self):
+        raise NotImplementedError
+
+    def update_host_note(self):
+        raise NotImplementedError
+
+    def update_proxy(self):
+        raise NotImplementedError
+
+    def update_user(self):
+        raise NotImplementedError
