@@ -1299,9 +1299,9 @@ class VectraClient(object):
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
-            if group['type'] == 'host':
+            if group['type'] in ['domain','ip']:
                 for member in group['members']:
-                    members.append(member['id'])
+                    members.append(member)
             else:
                 for member in group['members']:
                     members.append(member['id'])
@@ -2608,7 +2608,7 @@ class VectraClientV2_4(VectraClientV2_2):
         if not type:
             raise ValueError("missing required parameter: type")
         if type not in ['account', 'host', 'domain', 'ip']:
-            raise ValueError('parameter type must have value "domain", "ip" or "host"')
+            raise ValueError('parameter type must have value "account", "domain", "ip" or "host"')
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
 
@@ -2641,9 +2641,9 @@ class VectraClientV2_4(VectraClientV2_2):
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
-            if group['type'] == 'host':
+            if group['type'] in ['domain','ip']:
                 for member in group['members']:
-                    members.append(member['id'])
+                    members.append(member)
             elif group['type'] == 'account':
                 for member in group['members']:
                     members.append(member['uid'])
