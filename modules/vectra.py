@@ -11,11 +11,11 @@ warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 class HTTPException(Exception):
     def __init__(self, response):
-        """ 
+        """
         Custom exception class to report possible API errors
         The body is contructed by extracting the API error code from the requests.Response object
         """
-        try: 
+        try:
             r = response.json()
             if 'detail' in r:
                 detail = r['detail']
@@ -25,7 +25,7 @@ class HTTPException(Exception):
                 detail = r['_meta']['message']
             else:
                 detail = response.content
-        except Exception: 
+        except Exception:
             detail = response.content
         body = f'Status code: {str(response.status_code)} - {detail}'
         super().__init__(body)
@@ -112,14 +112,14 @@ class VectraClient(object):
 
     @request_error_handler
     def _request(self, method, url, **kwargs):
-        """ 
+        """
         Do a get request on the provided URL
         This is used by paginated endpoints
         :rtype: requests.Response
         """
         if method not in ['get', 'patch', 'put', 'post', 'delete']:
             raise ValueError('Invalid requests method provided')
-        
+
         if 'headers' in kwargs.keys():
             headers=kwargs.pop('headers')
         else:
@@ -256,7 +256,7 @@ class VectraClient(object):
             else:
                 raise ValueError(f'argument {str(k)} is an invalid rule query parameter')
         return params
-    
+
     @staticmethod
     def _generate_user_params(args):
         """
@@ -332,13 +332,13 @@ class VectraClient(object):
         :param last_updated_gte: return only campaigns with a last updated timestamp gte (datetime)
         :param note_modified_timestamp_gte: return only campaigns with a last updated timestamp on their note gte (datetime)
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are: id, dst_ip, target_domain, state, name, last_updated, 
+            possible values are: id, dst_ip, target_domain, state, name, last_updated,
             note, note_modified_by, note_modified_timestamp
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
         """
         return self._request(method='get', url=f'{self.url}/campaigns', params=self._generate_campaign_params(kwargs))
-    
+
     def get_all_campaigns(self, **kwargs):
         """
         Generator to retrieve all campaigns - all parameters are optional
@@ -349,7 +349,7 @@ class VectraClient(object):
         :param last_updated_gte: return only campaigns with a last updated timestamp gte (datetime)
         :param note_modified_timestamp_gte: return only campaigns with a last updated timestamp on their note gte (datetime)
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are: id, dst_ip, target_domain, state, name, last_updated, 
+            possible values are: id, dst_ip, target_domain, state, name, last_updated,
             note, note_modified_by, note_modified_timestamp
         :param page: page number to return (int)
         :param page_size: number of object to return in repsonse (int)
@@ -480,7 +480,7 @@ class VectraClient(object):
         """
         if not host_id:
             raise ValueError('Host id required')
-        
+
         return self._request(method='get', url=f'{self.url}/hosts/{host_id}', params=self._generate_host_by_id_params(kwargs))
 
     @validate_api_v2
@@ -637,11 +637,11 @@ class VectraClient(object):
         :param detection_category: detection category
         :param description:
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are: id, url, detection_url, category, detection, detection_category, 
+            possible values are: id, url, detection_url, category, detection, detection_category,
             detection_type, custom_detection, description, src_ip, state, t_score, c_score,
-            certainty, threat, first_timestamp, last_timestamp, targets_key_asset, 
-            is_targeting_key_asset, src_account, src_host, note, note_modified_by, 
-            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
+            certainty, threat, first_timestamp, last_timestamp, targets_key_asset,
+            is_targeting_key_asset, src_account, src_host, note, note_modified_by,
+            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to,
             assigned_date, groups, is_marked_custom, is_custom_model
         :param host_id: host id (int)
         :param is_targeting_key_asset: detection is targeting key asset (bool)
@@ -656,7 +656,7 @@ class VectraClient(object):
         :param state: state of detection (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
         :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
-        :param tags: tags assigned to detections; this uses substring matching 
+        :param tags: tags assigned to detections; this uses substring matching
         :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
         :param threat: threat score (int)
         :param threat_gte threat score is greater than or equal to (int)
@@ -677,11 +677,11 @@ class VectraClient(object):
         :param detection_category: detection category
         :param description:
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are: id, url, detection_url, category, detection, detection_category, 
+            possible values are: id, url, detection_url, category, detection, detection_category,
             detection_type, custom_detection, description, src_ip, state, t_score, c_score,
-            certainty, threat, first_timestamp, last_timestamp, targets_key_asset, 
-            is_targeting_key_asset, src_account, src_host, note, note_modified_by, 
-            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
+            certainty, threat, first_timestamp, last_timestamp, targets_key_asset,
+            is_targeting_key_asset, src_account, src_host, note, note_modified_by,
+            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to,
             assigned_date, groups, is_marked_custom, is_custom_model
         :param host_id: detection id (int)
         :param is_targeting_key_asset: detection is targeting key asset (bool)
@@ -713,11 +713,11 @@ class VectraClient(object):
         Get detection by id
         :param detection_id: detection id - required
         :param fields: comma separated string of fields to be filtered and returned - optional
-            possible values are: id, url, detection_url, category, detection, detection_category, 
+            possible values are: id, url, detection_url, category, detection, detection_category,
             detection_type, custom_detection, description, src_ip, state, t_score, c_score,
-            certainty, threat, first_timestamp, last_timestamp, targets_key_asset, 
-            is_targeting_key_asset, src_account, src_host, note, note_modified_by, 
-            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to, 
+            certainty, threat, first_timestamp, last_timestamp, targets_key_asset,
+            is_targeting_key_asset, src_account, src_host, note, note_modified_by,
+            note_modified_timestamp, sensor, sensor_name, tags, triage_rule_id, assigned_to,
             assigned_date, groups, is_marked_custom, is_custom_model
         """
         if not detection_id:
@@ -750,7 +750,7 @@ class VectraClient(object):
         Internal function to mark/unmark detections as fixed
         """
         payload = {
-            'detectionIdList': detection_ids, 
+            'detectionIdList': detection_ids,
             'mark_as_fixed': str(fixed)
             }
 
@@ -1290,7 +1290,7 @@ class VectraClient(object):
 
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
-        
+
         group = self.get_group_by_id(group_id = group_id).json()
         try:
             id = group['id']
@@ -1299,9 +1299,9 @@ class VectraClient(object):
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
-            if group['type'] == 'host':
+            if group['type'] in ['domain','ip']:
                 for member in group['members']:
-                    members.append(member['id'])
+                    members.append(member)
             else:
                 for member in group['members']:
                     members.append(member['id'])
@@ -1364,7 +1364,7 @@ class VectraClient(object):
         """
         if not user_id:
             raise ValueError('User id required')
-        
+
         if not account_type in ['local', 'ldap', 'radius', 'tacacs']:
             raise ValueError('Invalid account_type provided')
 
@@ -1380,7 +1380,7 @@ class VectraClient(object):
 
     @validate_api_v2
     def get_proxies(self, proxy_id=None):
-        """ 
+        """
         Get all defined proxies
         """
         if proxy_id:
@@ -1440,7 +1440,7 @@ class VectraClient(object):
 
     @validate_api_v2
     def delete_proxy(self,proxy_id=None):
-        """ 
+        """
         Delete a proxy from the proxy list
         :param proxy_id: ID of the proxy to delete
         """
@@ -1466,7 +1466,7 @@ class VectraClient(object):
 
         if not itype in ['Anonymize', 'Exfiltration', 'Malware Artifacts', 'Watchlist', 'C2']:
             raise ValueError(f'Invalid itype provided: {str(itype)}')
-        
+
         if not isinstance(duration, int):
             raise ValueError('Invalid duration provided, duration must be an integer value')
 
@@ -1640,7 +1640,7 @@ class VectraClient(object):
         """
         # Check that all provided ranges are valid
         all(ipaddress.ip_network(i) for i in include+exclude+drop)
-        
+
         if append and all(isinstance(i, list) for i in [include, exclude, drop]):
             current_list = self.get_internal_networks().json()
             # We must make all entries unique
@@ -1673,7 +1673,7 @@ class VectraClient(object):
             if not isinstance(check, str):
                 raise ValueError('check need to be a string')
             return self._request(method='get', url=f'{self.url}/health/{check}')
-        
+
 
 class VectraClientV2_1(VectraClient):
 
@@ -1725,7 +1725,7 @@ class VectraClientV2_1(VectraClient):
         for k, v in args.items():
             if k in valid_keys:
                 if v is not None:
-                    # We validate the parameters here as the error thrown by the endpoint is not very verbose 
+                    # We validate the parameters here as the error thrown by the endpoint is not very verbose
                     if search.match(v):
                         params[k] = v
                     else:
@@ -1746,14 +1746,14 @@ class VectraClientV2_1(VectraClient):
     def get_all_accounts(self, **kwargs):
         """
         Generator to retrieve all accounts - all parameters are optional
-        :param all: does nothing 
+        :param all: does nothing
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
         :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
         :param certainty: certainty score (int)
         :param certainty_gte: certainty score greater than or equal to (int)
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are id, url, name, state, threat, certainty, severity, account_type, 
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
+            possible values are id, url, name, state, threat, certainty, severity, account_type,
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category,
             last_detection_timestamp, detection_set, probable_home
         :param first_seen: first seen timestamp of the account (datetime)
         :param include_detection_summaries: include detection summary in response (bool)
@@ -1787,8 +1787,8 @@ class VectraClientV2_1(VectraClient):
         Get account by id
         :param account_id: account id - required
         :param fields: comma separated string of fields to be filtered and returned - optional
-            possible values are id, url, name, state, threat, certainty, severity, account_type, 
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
+            possible values are id, url, name, state, threat, certainty, severity, account_type,
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category,
             last_detection_timestamp, detection_set, probable_home
         """
         raise DeprecationWarning('This method is deprecated. Use API Version > 2.2')
@@ -1939,7 +1939,7 @@ class VectraClientV2_1(VectraClient):
             resp = self._request(method='get',url = resp.json()['next'])
             yield resp
 
-    def create_rule(self, detection_category=None, detection_type=None, triage_category=None, 
+    def create_rule(self, detection_category=None, detection_type=None, triage_category=None,
         source_conditions=None, additional_conditions=None, is_whitelist=False, **kwargs):
         """
         Create triage rule
@@ -1978,9 +1978,9 @@ class VectraClientV2_1(VectraClient):
         :param additional_conditions: JSON blobs to represent a tree-like conditional structure
             operators for leaf nodes: ANY_OF or NONE_OF
             operators for non-leaf nodes: AND or OR
-            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port, 
-                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port, 
-                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share, 
+            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port,
+                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port,
+                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share,
                 file_extensions, rdp_client_name, rdp_client_token, keyboard_name
             Here is an example of a payload:
             "additionalConditions": {
@@ -2011,7 +2011,7 @@ class VectraClientV2_1(VectraClient):
         """
         if not all([detection_category, detection_type, triage_category]):
             raise ValueError('Missing required parameter')
-        
+
         if detection_category.lower() not in ['botnet activity', 'command & control', 'reconnaissance', 'lateral movement', 'exfiltration']:
             raise ValueError("detection_category not recognized")
 
@@ -2061,9 +2061,9 @@ class VectraClientV2_1(VectraClient):
         :param additional_conditions: JSON blobs to represent a tree-like conditional structure
             operators for leaf nodes: ANY_OF or NONE_OF
             operators for non-leaf nodes: AND or OR
-            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port, 
-                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port, 
-                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share, 
+            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port,
+                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port,
+                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share,
                 file_extensions, rdp_client_name, rdp_client_token, keyboard_name
             Here is an example of a payload:
             "additionalConditions": {
@@ -2098,8 +2098,8 @@ class VectraClientV2_1(VectraClient):
             rule = self.get_rule_by_id(rule_id=rule_id).json()
         else:
             raise ValueError("rule id must be provided")
-        
-        valid_keys = ['description', 'priority', 'enabled', 'triage_category', 
+
+        valid_keys = ['description', 'priority', 'enabled', 'triage_category',
             'is_whitelist', 'source_conditions', 'additional_conditions']
 
         for k, v in kwargs.items():
@@ -2164,12 +2164,12 @@ class VectraClientV2_2(VectraClientV2_1):
         :rtype: dict
         """
         params = {}
-        valid_keys = ['accounts', 'assignees', 'created_after', 'fields', 'max_id', 'min_id', 
+        valid_keys = ['accounts', 'assignees', 'created_after', 'fields', 'max_id', 'min_id',
             'ordering', 'page', 'page_size', 'resolution', 'resolved']
 
         for k, v in args.items():
             if k in valid_keys:
-                if v is not None: 
+                if v is not None:
                     if isinstance(v, list):
                         # Backend needs list parameters as a comma-separated list
                         str_values = [str(int) for int in v]
@@ -2186,8 +2186,8 @@ class VectraClientV2_2(VectraClientV2_1):
         Get account by id
         :param account_id: account id - required
         :param fields: comma separated string of fields to be filtered and returned - optional
-            possible values are id, url, name, state, threat, certainty, severity, account_type, 
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category, 
+            possible values are id, url, name, state, threat, certainty, severity, account_type,
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category,
             last_detection_timestamp, detection_set, probable_home
         """
         if not account_id:
@@ -2235,7 +2235,7 @@ class VectraClientV2_2(VectraClientV2_1):
             raise TypeError('Note must be of type str')
 
         return self._request(method='patch', url=f'{self.url}/hosts/{host_id}/notes/{note_id}', json=payload)
-    
+
     def delete_host_note(self, host_id=None, note_id=None):
         """
         Set host note
@@ -2285,7 +2285,7 @@ class VectraClientV2_2(VectraClientV2_1):
             raise TypeError('Note must be of type str')
 
         return self._request(method='patch', url=f'{self.url}/detections/{detection_id}/notes/{note_id}', json=payload)
-    
+
     def delete_detection_note(self, detection_id=None, note_id=None):
         """
         Set detection note
@@ -2335,7 +2335,7 @@ class VectraClientV2_2(VectraClientV2_1):
             raise TypeError('Note must be of type str')
 
         return self._request(method='patch', url=f'{self.url}/accounts/{account_id}/notes/{note_id}', json=payload)
-    
+
     def delete_account_note(self, account_id=None, note_id=None):
         """
         Set account note
@@ -2403,7 +2403,7 @@ class VectraClientV2_2(VectraClientV2_1):
         :param assignment_id: assignment ID
         """
         return self._request(method='delete', url=f'{self.url}/assignments/{assignment_id}')
-    
+
     def set_assignment_resolved(self, assignment_id:int, detection_ids:list, outcome:int, note:str, mark_as_fixed:bool =  None, triage_as:str = None):
         """
         Set an assignment as resolved
@@ -2412,17 +2412,17 @@ class VectraClientV2_2(VectraClientV2_1):
             2: malicious_true_positive
             3: false_positive
         :param note: Note to add to fixed/triaged detections
-        :param triage_as: One-time triage detection(s) and rename as (str). 
-        :param mark_as_fixed: mark the detection(s) as fixed (bool). Custom triage_as and mark_as_fixed are mutually exclusive. 
+        :param triage_as: One-time triage detection(s) and rename as (str).
+        :param mark_as_fixed: mark the detection(s) as fixed (bool). Custom triage_as and mark_as_fixed are mutually exclusive.
         :param detection_ids: list of detection IDs to fix/triage
         """
-        if not triage_as and not mark_as_fixed: 
+        if not triage_as and not mark_as_fixed:
             raise ValueError('Either triage_as or mark_as_fixed are requited')
-        
+
         payload = {
             "outcome": outcome,
-            "note": note, 
-            "mark_as_fixed": mark_as_fixed, 
+            "note": note,
+            "mark_as_fixed": mark_as_fixed,
             "triage_as": triage_as,
             "detection_ids": detection_ids
             }
@@ -2431,7 +2431,7 @@ class VectraClientV2_2(VectraClientV2_1):
     def get_all_assignment_outcomes(self, **kwargs):
         """
         Get the outcome of a given assignment
-        :param : 
+        :param :
         """
         resp = self._request(method='get', url=f'{self.url}/assignment_outcomes')
         yield resp
@@ -2454,7 +2454,7 @@ class VectraClientV2_2(VectraClientV2_1):
         """
         if category not in ["benign_true_positive", "malicious_true_positive", "false_positive"]:
             raise ValueError('Invalid category provided')
-        
+
         payload = {
             "title": title,
             "category": category
@@ -2464,26 +2464,26 @@ class VectraClientV2_2(VectraClientV2_1):
     def update_assignment_outcome(self, outcome_id:int, title:str, category:str):
         """
         Update an existing custom Assignment Outcome
-        :param outcome_id: 
+        :param outcome_id:
         :param tile: title of the new Assignment Outcome to create.
         :param category: one of benign_true_positive, malicious_true_positive or false_positive
         """
         if category not in ["benign_true_positive", "malicious_true_positive", "false_positive"]:
             raise ValueError('Invalid category provided')
-        
+
         payload = {
             "title": title,
             "category": category
         }
         return self._request(method='put', url=f'{self.url}/assignment_outcomes/{outcome_id}', json=payload)
-    
+
     def delete_assignment_outcome(self, outcome_id:int):
         """
         Delete an existing custom Assignment Outcome
         :param outcome_id: ID of the Assignment Outcome to delete
         """
         return self._request(method='delete', url=f'{self.url}/assignment_outcomes/{outcome_id}')
-    
+
     def get_sensor_registration_token(self):
         """
         Get the existing sensor registration token.
@@ -2495,26 +2495,26 @@ class VectraClientV2_2(VectraClientV2_1):
             json_dict = {}
             response._content = json.dumps(json_dict).encode('utf-8')
         return response
-    
+
     def create_sensor_registration_token(self):
         """
-        Create a new sensor registration token. 
+        Create a new sensor registration token.
         The token will be valid for 24 hours.
         """
         return self._request(method='post', url=f'{self.url}/sensor_token')
-    
+
     def delete_sensor_registration_token(self):
         """
         Delete the existing sensor registration token
         """
         return self._request(method='delete', url=f'{self.url}/sensor_token')
-    
+
     def get_aws_external_connectors(self):
         """
         Get the configured external connectors for AWS.
         """
         return self._request(method='get', url=f'{self.url}/settings/aws_connectors')
-    
+
     def create_aws_external_connector(self, access_key:str, alias:str, secret_key:str, role_to_assume:str, account_type:str):
         """
         Add an external connector for AWS.
@@ -2526,10 +2526,10 @@ class VectraClientV2_2(VectraClientV2_1):
         :param account_type: The type of account being configured, either Single or Multiple
         """
         payload = {
-            "access_key":access_key, 
+            "access_key":access_key,
             "alias": alias,
-            "secret_key": secret_key, 
-            "role_to_assume": role_to_assume, 
+            "secret_key": secret_key,
+            "role_to_assume": role_to_assume,
             "account_type": account_type
         }
         return self._request(method='post', url=f'{self.url}/settings/aws_connectors',json=payload)
@@ -2557,11 +2557,11 @@ class VectraClientV2_4(VectraClientV2_2):
         :rtype: dict
         """
         params = {}
-        valid_keys = ['account_ids', 'account_names','description', 'domains', 'host_ids', 'host_names', 'importance', 
+        valid_keys = ['account_ids', 'account_names','description', 'domains', 'host_ids', 'host_names', 'importance',
                       'ips', 'last_modified_by', 'last_modified_timestamp', 'name', 'page', 'page_size', 'type']
         for k, v in args.items():
             if k in valid_keys:
-                if v is not None: 
+                if v is not None:
                     if k == 'importance' and v not in ["high", "medium", "low", "never_prioritize"]:
                         raise ValueError('importance is an invalid value, must be in ["high", "medium", "low", or "never_prioritize"]')
                     else:
@@ -2608,7 +2608,7 @@ class VectraClientV2_4(VectraClientV2_2):
         if not type:
             raise ValueError("missing required parameter: type")
         if type not in ['account', 'host', 'domain', 'ip']:
-            raise ValueError('parameter type must have value "domain", "ip" or "host"')
+            raise ValueError('parameter type must have value "account", "domain", "ip" or "host"')
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
 
@@ -2632,7 +2632,7 @@ class VectraClientV2_4(VectraClientV2_2):
         """
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
-        
+
         group = self.get_group_by_id(group_id = group_id).json()
         try:
             id = group['id']
@@ -2641,9 +2641,9 @@ class VectraClientV2_4(VectraClientV2_2):
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
-            if group['type'] == 'host':
+            if group['type'] in ['domain','ip']:
                 for member in group['members']:
-                    members.append(member['id'])
+                    members.append(member)
             elif group['type'] == 'account':
                 for member in group['members']:
                     members.append(member['uid'])
