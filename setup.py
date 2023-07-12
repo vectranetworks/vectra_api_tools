@@ -8,7 +8,7 @@ setup(
     description='Vectra API client library',
     long_description=long_desc,
     long_description_content_type='text/markdown',
-    version='2.2rc0',
+    version='2.4',
     author='Vectra',
     author_email='tme@vectra.ai',
     url='https://github.com/vectranetworks/vectra_api_tools',
@@ -30,6 +30,9 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
         'Topic :: Utilities'
     ]
 )
