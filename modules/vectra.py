@@ -7,6 +7,7 @@ import copy
 import ipaddress
 import os
 
+disable_warnings(exceptions.InsecureRequestWarning)
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 
@@ -85,19 +86,20 @@ class VectraClient(object):
         *Either token or user are required
         """
         self.url = url
-        self.version = 2 if token else 1
         self.verify = verify
 
         url = VectraClient._remove_trailing_slashes(url)
 
         if token:
-            self.url = f'{url}/api/v2'
+            self.version = 2
+            self.url = f'{url}/api/v{self.version}'
             self.headers = {
                 'Authorization': "Token " + token.strip(),
                 'Content-Type': "application/json",
                 'Cache-Control': "no-cache"
             }
         elif user and password:
+            self.version = 1
             self.url = f'{url}/api'
             self.auth = (user, password)
             deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
@@ -108,6 +110,10 @@ class VectraClient(object):
 
     @staticmethod
     def _remove_trailing_slashes(url):
+        if ':/' not in url:
+            url = 'https://' + url
+        else:
+            url = re.sub('^.*://?','https://',url)
         url = url[:-1] if url.endswith('/') else url
         return url
 
@@ -1689,8 +1695,9 @@ class VectraClientV2_1(VectraClient):
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
-        self.url = f'{url}/api/v2.1'
         self.version = 2.1
+        self.url = f'{url}/api/v{self.version}'
+
 
     @staticmethod
     def _generate_account_params(args):
@@ -2153,9 +2160,10 @@ class VectraClientV2_2(VectraClientV2_1):
         super().__init__(url=url, token=token, verify=verify)
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
-        # Set endpoint to APIv2.1
-        self.url = f'{url}/api/v2.2'
+        # Set endpoint to APIv2.2
         self.version = 2.2
+        self.url = f'{url}/api/v{self.version}'
+
 
     @staticmethod
     def _generate_assignment_params(args):
@@ -2547,8 +2555,10 @@ class VectraClientV2_4(VectraClientV2_2):
         super().__init__(url=url, token=token, verify=verify)
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
-        self.url = f'{url}/api/v2.4'
+        # Set endpoint to APIv2.4
         self.version = 2.4
+        self.url = f'{url}/api/v{self.version}'
+
 
     @staticmethod
     def _generate_group_params(args):
