@@ -5,7 +5,9 @@ import html
 import re
 import copy
 import ipaddress
+from urllib3 import disable_warnings, exceptions
 
+disable_warnings(exceptions.InsecureRequestWarning)
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 
@@ -84,19 +86,20 @@ class VectraClient(object):
         *Either token or user are required
         """
         self.url = url
-        self.version = 2 if token else 1
         self.verify = verify
 
         url = VectraClient._remove_trailing_slashes(url)
 
         if token:
-            self.url = f'{url}/api/v2'
+            self.version = 2
+            self.url = f'{url}/api/v{self.version}'
             self.headers = {
                 'Authorization': "Token " + token.strip(),
                 'Content-Type': "application/json",
                 'Cache-Control': "no-cache"
             }
         elif user and password:
+            self.version = 1
             self.url = f'{url}/api'
             self.auth = (user, password)
             deprecation('Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2'
@@ -107,6 +110,10 @@ class VectraClient(object):
 
     @staticmethod
     def _remove_trailing_slashes(url):
+        if ':/' not in url:
+            url = 'https://' + url
+        else:
+            url = re.sub('^.*://?','https://',url)
         url = url[:-1] if url.endswith('/') else url
         return url
 
@@ -1688,8 +1695,9 @@ class VectraClientV2_1(VectraClient):
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
         # Set endpoint to APIv2.1
-        self.url = f'{url}/api/v2.1'
         self.version = 2.1
+        self.url = f'{url}/api/v{self.version}'
+
 
     @staticmethod
     def _generate_account_params(args):
@@ -2152,9 +2160,10 @@ class VectraClientV2_2(VectraClientV2_1):
         super().__init__(url=url, token=token, verify=verify)
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
-        # Set endpoint to APIv2.1
-        self.url = f'{url}/api/v2.2'
+        # Set endpoint to APIv2.2
         self.version = 2.2
+        self.url = f'{url}/api/v{self.version}'
+
 
     @staticmethod
     def _generate_assignment_params(args):
@@ -2546,8 +2555,10 @@ class VectraClientV2_4(VectraClientV2_2):
         super().__init__(url=url, token=token, verify=verify)
         # Remove potential trailing slash
         url = VectraClient._remove_trailing_slashes(url)
-        self.url = f'{url}/api/v2.4'
+        # Set endpoint to APIv2.4
         self.version = 2.4
+        self.url = f'{url}/api/v{self.version}'
+
 
     @staticmethod
     def _generate_group_params(args):
@@ -2670,3 +2681,209 @@ class VectraClientV2_4(VectraClientV2_2):
         detections
         """
         return self._request(method='delete', url=f'{self.url}/groups/{group_id}')
+
+class VectraClientV2_5(VectraClientV2_4):
+    def __init__(self, url=None, token=None, verify=False):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        super().__init__(url=url, token=token, verify=verify)
+        # Remove potential trailing slash
+        url = VectraClient._remove_trailing_slashes(url)
+        # Set endpoint to APIv2.5
+        self.version = 2.5
+        self.url = f'{url}/api/v{self.version}'
+
+    @staticmethod
+    def _generate_group_params(args):
+        """
+        Generate query parameters for groups based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        params = {}
+        valid_keys = ['account_names','description', 'domains', 'host_ids', 'host_names', 'importance',
+                      'ips', 'last_modified_by', 'last_modified_timestamp', 'name', 'page', 'page_size', 'type']
+        for k, v in args.items():
+            if k in valid_keys:
+                if v is not None:
+                    if k == 'importance' and v not in ["high", "medium", "low", "never_prioritize"]:
+                        raise ValueError('importance is an invalid value, must be in ["high", "medium", "low", or "never_prioritize"]')
+                    else:
+                        params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid group query parameter')
+        return params
+    
+    def get_all_groups(self, **kwargs):
+        """
+        Generator to retrieve all groups - all parameters are optional
+        :param account_names: search for groups containing those account names (list)
+        :param description: description of groups to search
+        :param domains: search for groups containing those domains (list)
+        :param host_ids: search for groups containing those host IDs (list)
+        :param host_names: search for groups containing those hosts (list)
+        :param importance: search for groups of this specific importance (One of "high", "medium", "low", or "never_prioritize")
+        :param ips: search for groups containing those IPs (list)
+        :param last_modified_by: username of last person to modify this group
+        :param last_modified_timestamp: timestamp of last modification of group (datetime)
+        :param name: name of groups to search
+        :param page: page number to return (int) TODO check
+        :param page_size: number of object to return in repsonse (int) TODO check
+        :param type: type of group to search (domain/host/ip)
+        """
+        resp = self._request(method='get', url=f'{self.url}/groups', params=self._generate_group_params(kwargs))
+        yield resp
+        while resp.json()['next']:
+            resp = self._request(method='get', url=resp.json()['next'])
+            yield resp
+
+    @staticmethod
+    def _generate_vectramatch_params(args):
+        """
+        Generate query parameters for groups based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        params = {}
+        valid_keys = ['device_serial', 'device_serials', 'desired_state', 'uuid', 'file','notes']
+        for k, v in args.items():
+            if k in valid_keys:
+                if v is not None:
+                    if k == 'importance' and v not in ["high", "medium", "low", "never_prioritize"]:
+                        raise ValueError('importance is an invalid value, must be in ["high", "medium", "low", or "never_prioritize"]')
+                    else:
+                        params[k] = v
+            else:
+                raise ValueError(f'argument {str(k)} is an invalid group query parameter')
+        return params
+
+    def get_vectramatch_enablement(self, **kwargs):
+        """
+        Determine enablement state of desired device
+        :param device_serial: serial number of device (required)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if "device_serial" not in params.keys():
+            raise ValueError("Device serial number is required.")
+        resp = self._request(method='get', url=f'{self.url}/vectra-match/enablement', params=params)
+        return resp
+    
+    def set_vectramatch_enablement(self, **kwargs):
+        """
+        Set desired enablement state of device
+        :param device_serial: serial number of device (required)
+        :param desired_state: boolean True or False (required)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if "device_serial" not in params.keys():
+            raise ValueError("Device serial number is required.")
+            
+        if "desired_state" not in params.keys():
+            raise ValueError("Desired state is required (boolean).")
+        resp = self._request(method='post', url=f'{self.url}/vectra-match/enablement', json=params)
+        return resp
+
+    def get_vectramatch_stats(self, **kwargs):
+        """
+        Retrieve vectra-match stats
+        :param device_serial: serial number of device (optional)
+        """
+        resp = self._request(method='get', url=f'{self.url}/vectra-match/stats', params=self._generate_vectramatch_params(kwargs))
+        return resp
+
+    def get_vectramatch_status(self, **kwargs):
+        """
+        Retrieve vectra-match status
+        :param device_serial: serial number of device (optional)
+        """
+        resp = self._request(method='get', url=f'{self.url}/vectra-match/status', params=self._generate_vectramatch_params(kwargs))
+        return resp
+    
+    def get_vectramatch_available_devices(self):
+        """
+        Retrieve devices that can be enabled for vectra-match
+        """
+        resp = self._request(method='get', url=f'{self.url}/vectra-match/available-devices')
+        return resp
+    
+    def get_vectramatch_rules(self, **kwargs):
+        """
+        Retrieve vectra-match rules
+        :param uuid: uuid of an uploaded ruleset (required)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if "uuid" not in params.keys():
+            raise ValueError("Ruleset uuid must be provided.")
+        resp = self._request(method='get', url=f'{self.url}/vectra-match/rules', params=params)
+        return resp
+
+    def upload_vectramatch_rules(self, **kwargs):
+        """
+        Upload vectra-match rules
+        :param file: name of ruleset desired to be uploaded (required)
+        :param notes: notes about the uploaded file (optional)
+        """
+        params=self._generate_vectramatch_params(kwargs)
+        if "file" not in params.keys():
+            raise ValueError("A ruleset filename is required.")
+        if "notes" not in params.keys():
+            params["notes"] = ""
+        headers = {
+            'Authorization': self.headers["Authorization"]
+        }
+        resp = self._request(method='post', url=f'{self.url}/vectra-match/rules', headers=headers,
+                            files={"file":open(f"{params['file']}","rb")}, data={"notes": params['notes']})
+        return resp
+
+    def delete_vectramatch_rules(self, **kwargs):
+        """
+        Retrieve vectra-match rules
+        :param uuid: uuid of an uploaded ruleset (required)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if "uuid" not in params.keys():
+            raise ValueError("Must provide the uuid of the desired ruleset to be deleted.")
+        resp = self._request(method='delete', url=f'{self.url}/vectra-match/rules', json=params)
+        return resp
+
+    def get_vectramatch_assignment(self):
+        """
+        Retrieve ruleset assignments for vectra-match
+        """
+        resp = self._request(method='get', url=f'{self.url}/vectra-match/assignment')
+        return resp
+    
+    def set_vectramatch_assignment(self,**kwargs):
+        """
+        Assign ruleset to device
+        :param uuid: uuid of the ruleset to be assigned (required)
+        :param device_serials: list of devices to assign the ruleset (required)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if "uuid" not in params.keys():
+            raise ValueError("Must provide the ruleset uuid")
+        if "device_serials" not in params.keys():
+            raise ValueError("Must provide the serial number(s) of the device(s) to be assigned.")
+        elif not isinstance(params["device_serials"],list):
+            params["device_serials"] = params["device_serials"].split(",")
+        resp = self._request(method='post', url=f'{self.url}/vectra-match/assignment', json=params)
+        return resp
+
+    def delete_vectramatch_assignment(self,**kwargs):
+        """
+        Assign ruleset to device
+        :param uuid: uuid of the ruleset to be assigned (required)
+        :param device_serial: serial of device (required)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if "uuid" not in params.keys():
+            raise ValueError("Must provide the ruleset uuid")
+        if "device_serial" not in params.keys():
+            raise ValueError("Must provide the device serial number.")
+        resp = self._request(method='delete', url=f'{self.url}/vectra-match/assignment', json=params)
+        return resp
+        
