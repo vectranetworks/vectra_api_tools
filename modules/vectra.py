@@ -5,6 +5,7 @@ import html
 import re
 import copy
 import ipaddress
+import os
 
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
@@ -2670,3 +2671,234 @@ class VectraClientV2_4(VectraClientV2_2):
         detections
         """
         return self._request(method='delete', url=f'{self.url}/groups/{group_id}')
+
+class VectraClientV2_5(VectraClientV2_4):
+
+    def __init__(self, url=None, token=None, verify=False):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        super().__init__(url=url, token=token, verify=verify)
+        # Remove potential trailing slash
+        url = VectraClient._remove_trailing_slashes(url)
+        self.url = f'{url}/api/v2.5'
+        self.version = 2.5
+
+    @request_error_handler
+    def get_match_available_devices(self):
+        """
+        Get all currently available devices
+        """
+        return requests.get('{url}/vectra-match/available-devices'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def get_match_enablement(self, device_serial=None):
+        """
+        Get current enablement state for a given device
+        :param device_serial: Serial of the device
+        """
+        if not device_serial:
+            raise ValueError('Device serial required')
+
+        if not isinstance(device_serial, str):
+            raise TypeError('Device serial must be of type string')
+
+        return requests.get('{url}/vectra-match/enablement?device_serial={device_serial}'.format(url=self.url, device_serial=device_serial), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def set_match_enablement(self, device_serial=None, state='default'):
+        """
+        Set enablement state for a given device
+        :param device_serial: Serial of the device
+        :param state: Required state
+        """
+
+        if not device_serial:
+            raise ValueError('Device serial required')
+
+        if state == 'default':
+            raise ValueError('State required')
+
+        if not isinstance(state, bool):
+            raise TypeError('State must be of type bool')
+
+        if not isinstance(device_serial, str):
+            raise TypeError('Device serial must be of type str')
+
+        payload = {
+            "device_serial": device_serial,
+            "desired_state": state
+        }
+
+        return requests.post('{url}/vectra-match/enablement'.format(url=self.url, device_serial=device_serial), headers=self.headers, json=payload, verify=self.verify)
+
+    @request_error_handler
+    def get_match_status(self, device_serial=None):
+        """
+        Get current status for all devices
+        :param device_serial: Serial of the device
+        """
+
+        if device_serial and not isinstance(device_serial, str):
+            raise TypeError('Device serial must be of type string')
+
+        if device_serial:
+            return requests.get('{url}/vectra-match/status?device_serial={device_serial}'.format(url=self.url, device_serial=device_serial), headers=self.headers, verify=self.verify)
+        return requests.get('{url}/vectra-match/status'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def get_match_stats(self, device_serial=None):
+        """
+        Get stats for all devices
+        :param device_serial: Serial of the device
+        """
+
+        if device_serial and not isinstance(device_serial, str):
+            raise TypeError('Device serial must be of type string')
+
+        if device_serial:
+            return requests.get('{url}/vectra-match/stats?device_serial={device_serial}'.format(url=self.url, device_serial=device_serial), headers=self.headers, verify=self.verify)
+        return requests.get('{url}/vectra-match/stats'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def get_match_alert_stats(self, device_serial=None):
+        """
+        Get stats for all devices
+        :param device_serial: Serial of the device
+        """
+
+        if device_serial and not isinstance(device_serial, str):
+            raise TypeError('Device serial must be of type string')
+
+        if device_serial:
+            return requests.get('{url}/vectra-match/alert-stats?device_serial={device_serial}'.format(url=self.url, device_serial=device_serial), headers=self.headers, verify=self.verify)
+        return requests.get('{url}/vectra-match/alert-stats'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def get_match_ruleset_information(self, uuid=None):
+        """
+        Get information about a single ruleset
+        :param uuid: UUID of the ruleset
+        """
+
+        if not uuid:
+            raise ValueError('UUID required')
+
+        if not isinstance(uuid, str):
+            raise TypeError('UUID must be of type string')
+
+        return requests.get('{url}/vectra-match/rules?uuid={uuid}'.format(url=self.url, uuid=uuid), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def upload_match_ruleset(self, file_path=None, notes=None):
+        """
+        Upload and validate a new rules file
+        :param file_path: Path of the file to upload
+        :param notes: Optional notes to add
+        """
+
+        if not file_path:
+            raise ValueError('File path required')
+
+        if not isinstance(file_path, str):
+            raise TypeError('File path must be of type string')
+
+        if notes and not isinstance(notes, str):
+            raise TypeError('Notes must be of type string')
+
+        _, filename = os.path.split(file_path)
+
+        rule_file = open(file_path, 'rb')
+
+        payload = {
+            "notes": notes if notes else ''
+        }
+
+        headers = self.headers.copy()
+        del headers['Content-Type']
+
+        return requests.post('{url}/vectra-match/rules'.format(url=self.url), headers=headers, files={'file': rule_file}, data=payload, verify=self.verify)
+
+    @request_error_handler
+    def delete_match_ruleset(self, uuid=None):
+        """
+        Delete an existing ruleset
+        :param uuid: UUID of the ruleset
+        """
+
+        if not uuid:
+            raise ValueError('UUID required')
+
+        if not isinstance(uuid, str):
+            raise TypeError('UUID must be of type string')
+
+        payload = {
+            "uuid": uuid
+        }
+
+        return requests.delete('{url}/vectra-match/rules'.format(url=self.url), headers=self.headers, json=payload, verify=self.verify)
+
+    @request_error_handler
+    def get_match_assignment(self):
+        """
+        Get all existing mapping between rulesets and devices
+        """
+
+        return requests.get('{url}/vectra-match/assignment'.format(url=self.url), headers=self.headers, verify=self.verify)
+
+    @request_error_handler
+    def set_match_assignment(self, uuid=None, device_list=None):
+        """
+        Get all existing mapping between rulesets and devices
+        :param uuid: UUID of the ruleset
+        :param device_list: list of devices
+        """
+
+        if not uuid:
+            raise ValueError('UUID required')
+
+        if not isinstance(uuid, str):
+            raise TypeError('UUID must be of type string')
+
+        if not device_list:
+            raise ValueError('Device list required')
+
+        if not isinstance(device_list, list):
+            raise TypeError('Device list must be of type list')
+
+        payload = {
+            "uuid": uuid,
+            "device_serials": device_list
+        }
+
+        return requests.post('{url}/vectra-match/assignment'.format(url=self.url), headers=self.headers, json=payload, verify=self.verify)
+
+    @request_error_handler
+    def delete_match_assignment(self, uuid=None, device_serial=None):
+        """
+        Delete a rules file assignment to one device
+        :param uuid: UUID of the ruleset
+        :param device_serial: Serial of the device
+        """
+
+        if not uuid:
+            raise ValueError('UUID required')
+
+        if not isinstance(uuid, str):
+            raise TypeError('UUID must be of type string')
+
+        if not device_serial:
+            raise ValueError('Device serial required')
+
+        if not isinstance(device_serial, str):
+            raise TypeError('Device serial must be of type str')
+
+        payload = {
+            "uuid": uuid,
+            "device_serial": device_serial
+        }
+
+        return requests.delete('{url}/vectra-match/assignment'.format(url=self.url), headers=self.headers, json=payload, verify=self.verify)
