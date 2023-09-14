@@ -91,7 +91,7 @@ class VectraClient(object):
         url = VectraClient._remove_trailing_slashes(url)
 
         if token:
-            self.url = f'{url}/api/v2'
+            self.url = f'{url}/api/v2.5'
             self.headers = {
                 'Authorization': "Token " + token.strip(),
                 'Content-Type': "application/json",
