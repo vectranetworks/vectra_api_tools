@@ -8,10 +8,10 @@ setup(
     description='Vectra API client library',
     long_description=long_desc,
     long_description_content_type='text/markdown',
-    version='2.4',
+    version='3.3',
     author='Vectra',
-    author_email='tme@vectra.ai',
-    url='https://github.com/vectranetworks/vectra_api_tools',
+    author_email='bwyatt@vectra.ai',
+    url='https://github.com/bswyatt/vectra_api_tools.git',
     license='Apache 2.0',
     package_dir={
         'vat': 'modules'
