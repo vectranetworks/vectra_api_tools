@@ -7,7 +7,6 @@ import copy
 import ipaddress
 import os
 
-disable_warnings(exceptions.InsecureRequestWarning)
 warnings.filterwarnings('always', '.*', PendingDeprecationWarning)
 
 
