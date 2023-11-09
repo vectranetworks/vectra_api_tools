@@ -614,7 +614,6 @@ class VectraSaaSClient(object):
         if not rule_id:
             raise ValueError("Rule id required")
 
-        # deprecation('Some rules are no longer compatible with the APIv2, please switch to the APIv2.1')
 
         return self._request(
             method="get",
@@ -1271,7 +1270,6 @@ class VectraSaaSClient(object):
         return self._request(
             method="delete", url=f"{self.url}/accounts/{account_id}/notes/{note_id}"
         )
-        pass
 
     def get_all_assignments(self, **kwargs):
         """
@@ -1587,7 +1585,6 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
             resp = self._request(method="get", url=resp.json()["next"])
             yield resp
         url = f"{self.url}/entities"
-        pass
 
     def get_entity_by_id(self, entity_id=None, **kwargs):
         """
@@ -1784,8 +1781,15 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
 
         # Transform existing members into flat list as API returns dicts for host & account groups
         if append:
-            for member in group["members"]:
-                members.append(member["id"])
+            if group['type'] in ['domain','ip']:
+                for member in group['members']:
+                    members.append(member)
+            elif group['type'] == 'account':
+                for member in group['members']:
+                    members.append(member['uid'])
+            else:
+                for member in group['members']:
+                    members.append(member['id'])
         # Ensure members are unique
         members = list(set(members))
 
