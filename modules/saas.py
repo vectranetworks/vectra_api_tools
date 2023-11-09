@@ -33,13 +33,11 @@ class HTTPException(Exception):
 
 
 class HTTPUnauthorizedException(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    '''Specific Exception'''
 
 
 class HTTPTooManyRequestsException(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    '''Specific Exception'''
 
 
 def request_error_handler(func):
@@ -113,7 +111,7 @@ class VectraSaaSClient(object):
         if method not in ["get", "patch", "put", "post", "delete"]:
             raise ValueError("Invalid requests method provided")
 
-        if "headers" in kwargs.keys():
+        if "headers" in kwargs:
             headers = kwargs.pop("headers")
         else:
             headers = {
@@ -171,42 +169,36 @@ class VectraSaaSClient(object):
         """
         params = {}
         valid_keys = [
-            "fields",
-            "page",
-            "page_size",
-            "ordering",
-            "min_id",
-            "max_id",
-            "state",
-            "category",
-            "detection_type",
-            "detection_category",
-            "src_ip",
-            "t_score",
-            "t_score_gte",
-            "threat_score",
-            "threat_gte",
-            "c_score",
-            "c_score_gte",
-            "certainty",
-            "certainty_gte",
-            "last_timestamp",
-            "host_id",
-            "tags",
-            "destination",
-            "proto",
-            "is_targeting_key_asset",
-            "note_modified_timestamp_gte",
-            "src_account",
-            "id",
-        ]
-        deprecated_keys = [
-            "c_score",
-            "c_score_gte",
-            "category",
-            "t_score",
-            "t_score_gte",
-        ]
+                        "c_score",
+                        "c_score_gte",
+                        "category",
+                        "certainty",
+                        "certainty_gte",
+                        "destination",
+                        "detection_category",
+                        "detection_type",
+                        "fields",
+                        "host_id",
+                        "id",
+                        "is_targeting_key_asset",
+                        "last_timestamp",
+                        "max_id",
+                        "min_id",
+                        "note_modified_timestamp_gte",
+                        "ordering",
+                        "page",
+                        "page_size",
+                        "proto",
+                        "src_account",
+                        "src_ip",
+                        "state",
+                        "t_score",
+                        "t_score_gte",
+                        "tags",
+                        "threat_gte",
+                        "threat_score"
+                    ]
+        deprecated_keys = ["c_score", "c_score_gte", "category", "t_score", "t_score_gte"]
         for k, v in args.items():
             if k in valid_keys:
                 if v is not None:
@@ -228,25 +220,25 @@ class VectraSaaSClient(object):
         """
         params = {}
         valid_keys = [
+            "all",
+            "c_score",
+            "c_score_gte",
             "fields",
+            "id",
+            "max_id",
+            "min_id",
+            "name",
+            "note_modified_timestamp_gte",
+            "ordering",
             "page",
             "page_size",
-            "ordering",
-            "name",
+            "priviledge_category",
+            "privilege_level",
+            "privilege_level_gte",
             "state",
             "t_score",
             "t_score_gte",
-            "c_score",
-            "c_score_gte",
             "tags",
-            "all",
-            "min_id",
-            "max_id",
-            "note_modified_timestamp_gte",
-            "privilege_level",
-            "privilege_level_gte",
-            "priviledge_category",
-            "id",
         ]
         deprecated_keys = []
         for k, v in args.items():
@@ -401,13 +393,13 @@ class VectraSaaSClient(object):
         """
         params = {}
         valid_keys = [
+            "event_action",
+            "event_object",
             "event_timestamp_gte",
             "event_timestamp_lte",
             "from",
-            "user_id",
-            "event_object",
-            "event_action",
             "limit",
+            "user_id",
         ]
         deprecated_keys = []
         for k, v in args.items():
@@ -528,8 +520,8 @@ class VectraSaaSClient(object):
         :param certainty_gte: certainty score greater than or equal to (int)
         :param fields: comma separated string of fields to be filtered and returned
             possible values are id, url, name, state, threat, certainty, severity, account_type,
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category,
-            last_detection_timestamp, detection_set, probable_home
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level,
+            privilege_category, last_detection_timestamp, detection_set, probable_home
         :param first_seen: first seen timestamp of the account (datetime)
         :param include_detection_summaries: include detection summary in response (bool)
         :param last_seen: last seen timestamp of the account (datetime)
@@ -567,8 +559,8 @@ class VectraSaaSClient(object):
         :param account_id: account id - required
         :param fields: comma separated string of fields to be filtered and returned - optional
             possible values are id, url, name, state, threat, certainty, severity, account_type,
-            tags, note, note_modified_by, note_modified_timestamp, privilege_level, privilege_category,
-            last_detection_timestamp, detection_set, probable_home
+            tags, note, note_modified_by, note_modified_timestamp, privilege_level,
+            privilege_category, last_detection_timestamp, detection_set, probable_home
         """
         if not account_id:
             raise ValueError("Account id required")
@@ -584,12 +576,13 @@ class VectraSaaSClient(object):
         Generator to retrieve all rules page by page - all parameters are optional
         :param contains:
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are: active_detections, all_hosts, category, created_timestamp, description,
-            enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id, identity, ip,
-            ip_group, is_whitelist, last_timestamp, priority, remote1_dns, remote1_dns_groups,
-            remote1_ip, remote1_ip_groups, remote1_kerb_account, remote1_kerb_service, remote1_port,
-            remote1_proto, remote2_dns, remote2_dns_groups, remote2_ip, remote2_ip_groups, remote2_port,
-            remote2_proto, sensor_luid, smart_category, template, total_detections, type_vname, url
+            possible values are: active_detections, all_hosts, category, created_timestamp
+            description, enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group,
+            id, identity, ip, ip_group, is_whitelist, last_timestamp, priority, remote1_dns,
+            remote1_dns_groups, remote1_ip, remote1_ip_groups, remote1_kerb_account,
+            remote1_kerb_service, remote1_port, remote1_proto, remote2_dns, remote2_dns_groups,
+            remote2_ip, remote2_ip_groups, remote2_port, remote2_proto, sensor_luid, smart_category,
+            template, total_detections, type_vname, url
         :param include_templates: include rule templates, default is False
         :param ordering: field used to sort response
         :param page: page number to return (int)
@@ -610,12 +603,13 @@ class VectraSaaSClient(object):
         Get triage rules by id
         :param rule_id: id of triage rule to retrieve
         :param fields: comma separated string of fields to be filtered and returned
-            possible values are: active_detections, all_hosts, category, created_timestamp, description,
-            enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id, identity, ip,
-            ip_group, is_whitelist, last_timestamp, priority, remote1_dns, remote1_dns_groups,
-            remote1_ip, remote1_ip_groups, remote1_kerb_account, remote1_kerb_service, remote1_port,
-            remote1_proto, remote2_dns, remote2_dns_groups, remote2_ip, remote2_ip_groups, remote2_port,
-            remote2_proto, sensor_luid, smart_category, template, total_detections, type_vname, url
+            possible values are: active_detections, all_hosts, category, created_timestamp,
+            description, enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id,
+            identity, ip, ip_group, is_whitelist, last_timestamp, priority, remote1_dns,
+            remote1_dns_groups, remote1_ip, remote1_ip_groups, remote1_kerb_account,
+            remote1_kerb_service, remote1_port, remote1_proto, remote2_dns, remote2_dns_groups,
+            remote2_ip, remote2_ip_groups, remote2_port, remote2_proto, sensor_luid, smart_category,
+            template, total_detections, type_vname, url
         """
         if not rule_id:
             raise ValueError("Rule id required")
@@ -674,10 +668,11 @@ class VectraSaaSClient(object):
         :param additional_conditions: JSON blobs to represent a tree-like conditional structure
             operators for leaf nodes: ANY_OF or NONE_OF
             operators for non-leaf nodes: AND or OR
-            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port,
-                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port,
-                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share,
-                file_extensions, rdp_client_name, rdp_client_token, keyboard_name
+            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto,
+                remote1_port, remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups,
+                remote2_proto, remote2_port, remote2_dns, remote2_dns_groups, account, named_pipe,
+                uuid, identity, service, file_share, file_extensions, rdp_client_name,
+                rdp_client_token, keyboard_name
             Here is an example of a payload:
             "additionalConditions": {
                 "OR": [
@@ -719,24 +714,20 @@ class VectraSaaSClient(object):
 
         detection_types = {
             "command & control": [
-                "azure ad admin account creation",
-                "azure ad mfa-failed suspicious sign-on",
-                "o365 power automate http flow creation",
-                "azure ad redundant access creation",
-                "azure ad suspicious oauth application",
-                "o365 suspicious power automate flow creation azure",
                 "ad suspicious sign-on",
-                "azure ad tor activity",
                 "aws root credential usage",
                 "aws suspicious credential usage",
                 "aws tor activity",
+                "azure ad admin account creation",
+                "azure ad mfa-failed suspicious sign-on",
+                "azure ad redundant access creation",
+                "azure ad suspicious oauth application",
+                "azure ad tor activity",
+                "o365 power automate http flow creation",
+                "o365 suspicious power automate flow creation azure",
             ],
             "botnet activity": ["aws cryptomining"],
             "reconnaissance": [
-                "o365 suspicious compliance search",
-                "o365 unusual ediscovery search",
-                "o365 suspect ediscovery",
-                "usage",
                 "aws ec2 enumeration",
                 "aws organization discovery",
                 "aws s3 enumeration",
@@ -745,40 +736,44 @@ class VectraSaaSClient(object):
                 "aws suspect credential access from ssm",
                 "aws suspect escalation reconnaissance",
                 "aws user permission enumeration",
+                "o365 suspect ediscovery",
+                "o365 suspicious compliance search",
+                "o365 unusual ediscovery search",
+                "usage",
             ],
             "lateral movement": [
-                "azure ad successful brute-force",
-                "o365 suspicious mailbox manipulation",
-                "o365 attacker tool: ruler",
-                "azure ad change to trusted ip configuration o365 disabling of security tools",
-                "o365 dll hijacking activity",
-                "o365 external teams access",
-                "o365 internal spearphising",
-                "o365 log disabling attempt",
-                "o365 malware stage: upload",
-                "azure ad mfa disabled",
-                "azure ad newly created admin account o365 ransomware",
-                "o365 risky exchange operation",
-                "azure ad privilege operation anomaly",
-                "o365 suspicious sharepoint operation",
-                "o365 suspicious teams application",
-                "azure ad unusual scripting engine usage aws ecr hijacking",
                 "aws lambda hijacking aws logging disabled",
                 "aws ransomware s3 activity",
                 "aws security tools disabled",
                 "aws suspect admin privilege granting aws suspect console pivot",
                 "aws suspect login profile manipulation aws suspect privilege escalation",
                 "aws user hijacking",
+                "azure ad change to trusted ip configuration o365 disabling of security tools",
+                "azure ad mfa disabled",
+                "azure ad newly created admin account o365 ransomware",
+                "azure ad privilege operation anomaly",
+                "azure ad successful brute-force",
+                "azure ad unusual scripting engine usage aws ecr hijacking",
+                "o365 attacker tool: ruler",
+                "o365 dll hijacking activity",
+                "o365 external teams access",
+                "o365 internal spearphising",
+                "o365 log disabling attempt",
+                "o365 malware stage: upload",
+                "o365 risky exchange operation",
+                "o365 suspicious mailbox manipulation",
+                "o365 suspicious sharepoint operation",
+                "o365 suspicious teams application",
             ],
             "exfiltration": [
-                "o365 ediscovery exfil",
-                "o365 exfiltration before termination",
-                "o365 suspicious download activity",
-                "o365 suspicious exchange transport rule o365 suspicious mail forwarding",
-                "o365 suspect power automate activity o365 suspicious sharing activity",
                 "aws suspect external access granting aws suspect public ebs change",
                 "aws suspect public ec2 change",
                 "aws suspect public s3 change",
+                "o365 ediscovery exfil",
+                "o365 exfiltration before termination",
+                "o365 suspect power automate activity o365 suspicious sharing activity",
+                "o365 suspicious download activity",
+                "o365 suspicious exchange transport rule o365 suspicious mail forwarding",
             ],
         }
         if detection_type.lower() not in detection_types[detection_category]:
@@ -852,10 +847,11 @@ class VectraSaaSClient(object):
         :param additional_conditions: JSON blobs to represent a tree-like conditional structure
             operators for leaf nodes: ANY_OF or NONE_OF
             operators for non-leaf nodes: AND or OR
-            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto, remote1_port,
-                remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups, remote2_proto, remote2_port,
-                remote2_dns, remote2_dns_groups, account, named_pipe, uuid, identity, service, file_share,
-                file_extensions, rdp_client_name, rdp_client_token, keyboard_name
+            possible value for conditions: remote1_ip, remote1_ip_groups, remote1_proto,
+                remote1_port, remote1_dns, remote1_dns_groups, remote2_ip, remote2_ip_groups,
+                remote2_proto, remote2_port, remote2_dns, remote2_dns_groups, account, named_pipe,
+                uuid, identity, service, file_share, file_extensions, rdp_client_name,
+                rdp_client_token, keyboard_name
             Here is an example of a payload:
             "additionalConditions": {
                 "OR": [
@@ -1514,12 +1510,12 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
         """
         params = {}
         valid_keys = [
-            "is_prioritized",
             "entity_type",
-            "ordering",
+            "is_prioritized",
             "last_detection_timestamp_gte",
             "name",
             "note_modified_timestamp_gte",
+            "ordering",
             "page",
             "page_size",
             "state",
@@ -1547,12 +1543,12 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
         """
         params = {}
         valid_keys = [
-            "type",
             "entity_type",
-            "include_score_decreases",
-            "from",
-            "limit",
             "event_timestamp_gte",
+            "from",
+            "include_score_decreases",
+            "limit",
+            "type",
         ]
         deprecated_keys = ["entity_type"]
         for k, v in args.items():
@@ -1609,7 +1605,7 @@ class VectraSaaSClientV3_1(VectraSaaSClient):
         params = self._generate_entity_params(kwargs)
         if not entity_id:
             raise ValueError("Must provide entity_id.")
-        if "entity_type" not in params.keys():
+        if "entity_type" not in params:
             raise ValueError("Must provide entity_type.")
 
         return self._request(
@@ -1658,10 +1654,10 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         valid_keys = [
             "account_ids",
             "account_names",
-            "importance",
             "description",
-            "last_modified_timestamp",
+            "importance",
             "last_modified_by",
+            "last_modified_timestamp",
             "name",
             "type",
         ]
@@ -1727,7 +1723,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         return response.json()["results"]
 
     def create_group(
-        self, name=None, description="", members=[], importance=None, **kwargs
+        self, name=None, description="", group_type='', members=[], importance='Medium', **kwargs
     ):
         """
         Create group
@@ -1735,9 +1731,13 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         :param description: description of the group
         :param type: type of the group to create (domain/host/ip)
         :param members: list of account ids to add to group
+        :param importance: int importance of the entities in this list
         :param rules: list of triage rule ids to add to group
         :rtype requests.Response:
         """
+        #TODO: validate type
+        #TODO: convert importance from string to int
+        #TODO: validate k,v
         if not name:
             raise ValueError("missing required parameter: name")
         if not isinstance(members, list):
@@ -1748,7 +1748,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         payload = {
             "name": name,
             "description": description,
-            "type": "account",
+            "type": group_type,
             "members": members,
             "importance": importance,
         }
@@ -1833,28 +1833,28 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         """
         params = {}
         valid_keys = [
-            "page",
-            "page_size",
-            "ordering",
-            "name",
-            "state",
-            "last_source",
-            "threat",
-            "t_score",
-            "t_score_gte",
-            "certainty",
             "c_score",
             "c_score_gte",
-            "last_detection_timestamp",
-            "tags",
+            "certainty",
             "key_asset",
-            "min_id",
-            "max_id",
+            "last_detection_timestamp",
+            "last_source",
             "mac_address",
+            "max_id",
+            "min_id",
+            "name",
             "note_modified_timestamp_gte",
+            "ordering",
+            "page",
+            "page_size",
+            "privilege_category",
             "privilege_level",
             "privilege_level_gte",
-            "privilege_category",
+            "state",
+            "t_score",
+            "t_score_gte",
+            "tags",
+            "threat",
         ]
         deprecated_keys = []
         for k, v in args.items():
@@ -1900,12 +1900,12 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         """
         params = {}
         valid_keys = [
+            "desired_state",
             "device_serial",
             "device_serials",
-            "desired_state",
-            "uuid",
             "file",
             "notes",
+            "uuid",
         ]
         for k, v in args.items():
             if k in valid_keys:
@@ -1933,15 +1933,15 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         """
         params = {}
         valid_keys = [
-            "from",
-            "limit",
+            "detection_id",
+            "entity_type",
             "event_timestamp_gte",
             "event_timestamp_lte",
-            "type",
-            "entity_type",
+            "from",
             "include_info_category",
             "include_triaged",
-            "detection_id",
+            "limit",
+            "type",
         ]
         for k, v in args.items():
             if k in valid_keys:
@@ -1959,7 +1959,7 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param device_serial: serial number of device (required)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "device_serial" not in params.keys():
+        if "device_serial" not in params:
             raise ValueError("Device serial number is required.")
         resp = self._request(
             method="get", url=f"{self.url}/vectra-match/enablement", params=params
@@ -1973,10 +1973,10 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param desired_state: boolean True or False (required)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "device_serial" not in params.keys():
+        if "device_serial" not in params:
             raise ValueError("Device serial number is required.")
 
-        if "desired_state" not in params.keys():
+        if "desired_state" not in params:
             raise ValueError("Desired state is required (boolean).")
         resp = self._request(
             method="post", url=f"{self.url}/vectra-match/enablement", json=params
@@ -2022,7 +2022,7 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param uuid: uuid of an uploaded ruleset (required)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params.keys():
+        if "uuid" not in params:
             raise ValueError("Ruleset uuid must be provided.")
         resp = self._request(
             method="get", url=f"{self.url}/vectra-match/rules", params=params
@@ -2036,9 +2036,9 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param notes: notes about the uploaded file (optional)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "file" not in params.keys():
+        if "file" not in params:
             raise ValueError("A ruleset filename is required.")
-        if "notes" not in params.keys():
+        if "notes" not in params:
             params["notes"] = ""
         headers = {"Authorization": self.headers["Authorization"]}
         resp = self._request(
@@ -2056,7 +2056,7 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param uuid: uuid of an uploaded ruleset (required)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params.keys():
+        if "uuid" not in params:
             raise ValueError(
                 "Must provide the uuid of the desired ruleset to be deleted."
             )
@@ -2079,9 +2079,9 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param device_serials: list of devices to assign the ruleset (required)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params.keys():
+        if "uuid" not in params:
             raise ValueError("Must provide the ruleset uuid")
-        if "device_serials" not in params.keys():
+        if "device_serials" not in params:
             raise ValueError(
                 "Must provide the serial number(s) of the device(s) to be assigned."
             )
@@ -2099,9 +2099,9 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         :param device_serial: serial of device (required)
         """
         params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params.keys():
+        if "uuid" not in params:
             raise ValueError("Must provide the ruleset uuid")
-        if "device_serial" not in params.keys():
+        if "device_serial" not in params:
             raise ValueError("Must provide the device serial number.")
         resp = self._request(
             method="delete", url=f"{self.url}/vectra-match/assignment", json=params
@@ -2520,7 +2520,6 @@ class VectraSaaSClientV3_3(VectraSaaSClientV3_2):
         )
 
     def get_lockdown(self, **kwargs):
-        """ """
         params = {}
         valid_keys = ["type", "entity_type"]
         deprecated_keys = ["entity_type"]
