@@ -1650,7 +1650,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        params = {"type": "account"}
+        params = {}
         valid_keys = [
             "account_ids",
             "account_names",
@@ -1659,6 +1659,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
             "last_modified_by",
             "last_modified_timestamp",
             "name",
+            "page_size",
             "type",
         ]
         for k, v in args.items():
@@ -1723,7 +1724,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         return response.json()["results"]
 
     def create_group(
-        self, name=None, description="", group_type='', members=[], importance='Medium', **kwargs
+        self, name=None, description="", type='', members=[], importance='Medium', **kwargs
     ):
         """
         Create group
@@ -1731,7 +1732,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         :param description: description of the group
         :param type: type of the group to create (domain/host/ip)
         :param members: list of account ids to add to group
-        :param importance: int importance of the entities in this list
+        :param importance: importance of the entities in this list [high,medium,low]
         :param rules: list of triage rule ids to add to group
         :rtype requests.Response:
         """
@@ -1748,7 +1749,7 @@ class VectraSaaSClientV3_2(VectraSaaSClientV3_1):
         payload = {
             "name": name,
             "description": description,
-            "type": group_type,
+            "type": type,
             "members": members,
             "importance": importance,
         }
