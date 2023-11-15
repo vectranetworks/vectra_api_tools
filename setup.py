@@ -17,7 +17,7 @@ setup(
         'vat': 'modules'
     },
     packages=['vat'],
-    install_requires=['requests', 'pytz', 'cabby', 'stix'],
+    install_requires=['requests', 'pytz', 'cabby', 'stix', 'prettytable'],
     python_requires='>=3.4',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
