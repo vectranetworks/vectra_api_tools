@@ -1,5 +1,9 @@
+.env/*
 *.pyc
 .coverage
+.DS_Store
 htmlcov
 .pytest_cache
 __pycache__
+match.rules
+.vscode
