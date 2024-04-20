@@ -1,7 +1,12 @@
+.DS_Store
+test/.DS*
+.pdm-python
+.vscode/*
 .env/*
+build/*
+vectra_api_tools.egg-info/*
 *.pyc
 .coverage
 htmlcov
 .pytest_cache
 __pycache__
-match.rules
