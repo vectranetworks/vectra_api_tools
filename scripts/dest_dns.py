@@ -73,7 +73,6 @@ if args["summary"] == "detection":
     for pair in countSet:
         value = detectionList.count(pair)
         detectionCount.append([pair[0], pair[1], value])
-        # print(pair, value)
 
     detectionCount = sorted(detectionCount, key=itemgetter(2, 0), reverse=True)
 
@@ -92,7 +91,6 @@ if args["summary"] == "total":
             else:
                 dstDict[detection_detail["dst_dns"]] = 1
 
-    #    pprint.pprint(srcDict)
     print("\n\n{:*<40}{:*<5}".format("Source", "Count"))
     for key, value in sorted(dstDict.iteritems(), key=lambda k, v: v, reverse=True):
         print("{:<40}{:<5}".format(key, value))
