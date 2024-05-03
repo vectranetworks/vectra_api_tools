@@ -50,5 +50,5 @@ for result in response['results']:
 # pprint.pprint(detectionDict)
 
 print('\n\n{:*<40}{:*<5}'.format('Detection', 'Count'))
-for key, value in sorted(detectionDict.iteritems(), key=lambda (k, v): v, reverse=True):
+for key, value in sorted(detectionDict.iteritems(), key=lambda k, v: v, reverse=True):
     print('{:<40}{:<5}'.format(key, value))
