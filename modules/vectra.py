@@ -6,7 +6,6 @@ import os
 import re
 import warnings
 
-
 import requests
 from urllib3 import disable_warnings, exceptions
 
@@ -56,12 +55,13 @@ def request_error_handler(func):
         elif response.status_code == 429:
             raise HTTPTooManyRequestsException(response)
         else:
-            print(response.request.url)
-            print(response.request.headers)
-            try:
-                print(response.request.data)
-            except AttributeError:
-                print(response.request.body)
+            if self._debug:
+                print(response.request.url)
+                print(response.request.headers)
+                try:
+                    print(response.request.data)
+                except AttributeError:
+                    print(response.request.body)
             raise HTTPException(response)
 
     return request_handler
@@ -157,6 +157,7 @@ class VectraBaseClient(object):
     VERSION3 = 3
     VERSION2 = 2
     VERSION1 = 1
+    _debug = False
 
     def __init__(
         self,
@@ -211,6 +212,12 @@ class VectraBaseClient(object):
                 "token for v2, "
                 "or username and password for v1."
             )
+
+    def enable_debug(self):
+        self._debug = True
+
+    def disable_debug(self):
+        self._debug = False
 
     @request_error_handler
     def _request(self, method, url, **kwargs):
@@ -510,41 +517,6 @@ class VectraBaseClient(object):
             "type",
         ]
 
-        deprecated_keys = []
-
-        return _generate_params(args, valid_keys, deprecated_keys)
-
-    @staticmethod
-    def _generate_rule_params(args):
-        """
-        Generate query parameters for rules based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-
-        Valid params in the dict
-        :param name: name of rule to search (substring matching)
-        :param rule_id: ID of rule to return
-        :param contains:
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are: active_detections, all_hosts, category, created_timestamp, description,
-            enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id, identity, ip,
-            ip_group, is_whitelist, last_timestamp, priority, remote1_dns, remote1_dns_groups,
-            remote1_ip, remote1_ip_groups, remote1_kerb_account, remote1_kerb_service, remote1_port,
-            remote1_proto, remote2_dns, remote2_dns_groups, remote2_ip, remote2_ip_groups, remote2_port,
-            remote2_proto, sensor_luid, smart_category, template, total_detections, type_vname, url
-        :param include_templates: include rule templates, default is False
-        :param ordering: field used to sort response
-        :param page: page number to return (int)
-        :param page_size: number of object to return in response (int)
-        """
-        valid_keys = [
-            "contains",
-            "fields",
-            "include_templates",
-            "page",
-            "page_size",
-            "ordering",
-        ]
         deprecated_keys = []
 
         return _generate_params(args, valid_keys, deprecated_keys)
@@ -1463,7 +1435,7 @@ class VectraBaseClient(object):
             response = self.get_groups(description=description)
             return response.json()["results"]
 
-    @validate_gte_api_v3_2
+    @validate_api_v2
     def create_group(
         self, name=None, description="", type=None, members=[], rules=[], **kwargs
     ):
@@ -1932,7 +1904,7 @@ class VectraBaseClient(object):
             method="post", url=f"{self.url}/settings/internal_network", json=payload
         )
 
-    # @validate_gte_api_v3_3
+    @validate_gte_api_v3_3
     def get_health_check(self, check=None, cache=True, vlans=True):
         """
         Get health statistics for the appliance
@@ -3094,6 +3066,43 @@ class VectraClientV2_4(VectraClientV2_2):
         )
 
     @staticmethod
+    def _generate_rule_params(args):
+        """
+        Generate query parameters for rules based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+
+        Valid params in the dict
+        :param name: name of rule to search (substring matching)
+        :param rule_id: ID of rule to return
+        :param contains:
+        :param fields: comma separated string of fields to be filtered and returned
+            possible values are: active_detections, all_hosts, category, created_timestamp, description,
+            enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id, identity, ip,
+            ip_group, is_whitelist, last_timestamp, priority, remote1_dns, remote1_dns_groups,
+            remote1_ip, remote1_ip_groups, remote1_kerb_account, remote1_kerb_service, remote1_port,
+            remote1_proto, remote2_dns, remote2_dns_groups, remote2_ip, remote2_ip_groups, remote2_port,
+            remote2_proto, sensor_luid, smart_category, template, total_detections, type_vname, url
+        :param include_templates: include rule templates, default is False
+        :param ordering: field used to sort response
+        :param page: page number to return (int)
+        :param page_size: number of object to return in response (int)
+        """
+        valid_keys = [
+            "contains",
+            "description",
+            "fields",
+            "include_templates",
+            "is_whitelist",
+            "page",
+            "page_size",
+            "ordering",
+        ]
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
     def _generate_group_params(args):
         """
         Generate query parameters for groups based on provided args
@@ -3308,6 +3317,9 @@ class VectraClientV2_4(VectraClientV2_2):
             raise ValueError(
                 'parameter type must have value "account", "domain", "ip" or "host"'
             )
+        if type == "domain" and members == []:
+            members = [""]
+
         if not isinstance(members, list):
             raise TypeError("members must be type: list")
 
@@ -3317,8 +3329,13 @@ class VectraClientV2_4(VectraClientV2_2):
             "type": type,
             "members": members,
         }
+
         for k, v in kwargs.items():
             payload[k] = v
+
+        if self.VERSION3 is not None:
+            if "importance" not in payload:
+                payload["importance"] = "medium"
         return self._request(method="post", url=f"{self.url}/groups", json=payload)
 
     @validate_gte_api_v3_2
@@ -3402,33 +3419,6 @@ class VectraClientV2_5(VectraClientV2_4):
             token=token,
             verify=verify,
         )
-
-    @staticmethod
-    def _generate_group_params(args):
-        """
-        Generate query parameters for groups based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-        """
-        valid_keys = [
-            "account_names",
-            "description",
-            "domains",
-            "host_ids",
-            "host_names",
-            "importance",
-            "ips",
-            "last_modified_by",
-            "last_modified_timestamp",
-            "name",
-            "page",
-            "page_size",
-            "type",
-        ]
-
-        deprecated_keys = []
-
-        return _generate_params(args, valid_keys, deprecated_keys)
 
     @staticmethod
     def _generate_vectramatch_params(args):

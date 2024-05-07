@@ -5,7 +5,6 @@ The current repository is broken down into the following:
 * _modules_ - this directory contains the modules associated with the VAT library
 * _scripts_ - collection of scripts to interact with the Vectra api. These scripts can be used as-is or as a reference on how to leverage the VAT library
 * _test_ - collection of tests that can be used to validate the VAT library
-* _Vectra\_APIv1.postman\_collection_ is a Postman collection for the Vectra API. It has all of the current endpoints and and associated parameters for each endpoint
 
 **Wiki**  
 https://github.com/vectranetworks/vectra_api_tools/wiki
@@ -29,4 +28,16 @@ pip install git+https://github.com/vectranetworks/vectra_api_tools.git@develop
 source:
 ```
 python setup.py install
+```
+
+**Instantiation**
+* For v2
+```
+import vat.vectra as detect
+detect_client = detect.VectraClientV2_5(url="",token="")
+```
+* For v3
+```
+import vat.platform as platform
+platform_client = platform.VectraPlatformClientV3_3(url="",client_id="",secret_key="")
 ```
