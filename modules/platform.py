@@ -607,6 +607,7 @@ class VectraPlatformClientV3_2(VectraPlatformClientV3_1):
             "last_modified_timestamp",
             "last_modified_by",
             "name",
+            "page_size",
             "type",
         ]
 
@@ -662,9 +663,11 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             "state",
             "last_source",
             "threat",
+            "threat_gte",
             "t_score",
             "t_score_gte",
             "certainty",
+            "certainty_gte",
             "c_score",
             "c_score_gte",
             "last_detection_timestamp",
@@ -693,11 +696,13 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         valid_keys = [
             "account_ids",
             "account_names",
-            "host_ids" "importance",
+            "host_ids",
+            "importance",
             "description",
             "last_modified_timestamp",
             "last_modified_by",
             "name",
+            "page_size",
             "type",
         ]
 
