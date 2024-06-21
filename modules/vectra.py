@@ -25,6 +25,8 @@ class HTTPException(Exception):
                 detail = r["detail"]
             elif "errors" in r:
                 detail = r["errors"][0]["title"]
+            elif "tree_structure" in r:
+                detail = "\n".join(r["tree_structure"])
             elif "_meta" in r:
                 detail = r["_meta"]["message"]
             else:
@@ -36,6 +38,11 @@ class HTTPException(Exception):
 
 
 class HTTPUnauthorizedException(HTTPException):
+    def __init__(self, response):
+        super().__init__(response)
+
+
+class HTTPTUnprocessableContentException(HTTPException):
     def __init__(self, response):
         super().__init__(response)
 
@@ -52,6 +59,8 @@ def request_error_handler(func):
             return response
         elif response.status_code == 401:
             raise HTTPUnauthorizedException(response)
+        elif response.status_code == 422:
+            raise HTTPTUnprocessableContentException(response)
         elif response.status_code == 429:
             raise HTTPTooManyRequestsException(response)
         else:
@@ -1202,8 +1211,7 @@ class VectraBaseClient(object):
         """
         if not all([detection_category, detection_type, triage_category]):
             raise KeyError(
-                "missing required parameter: "
-                "detection_category, detection_type, triage_category"
+                "missing required parameter: detection_category, detection_type, triage_category"
             )
         if detection_category.lower() not in [
             "botnet activity",
@@ -1231,6 +1239,7 @@ class VectraBaseClient(object):
             "host_group",
             "sensor_luid",
             "priority",
+            "enabled",
             "all_hosts",
             "remote1_ip",
             "remote1_ip_groups",
@@ -1256,16 +1265,18 @@ class VectraBaseClient(object):
             "keyboard_name",
         ]
 
-        deprecated_keys = []
-
-        params = _generate_params(kwargs, valid_keys, deprecated_keys)
-
-        payload.update(params)
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                payload[k] = v
+            else:
+                raise ValueError(
+                    f"argument {str(k)} is an invalid field for rule creation"
+                )
 
         return self._request(method="post", url=f"{self.url}/rules", json=payload)
 
     @validate_gte_api_v2
-    def update_rule(self, rule_id=None, name=None, append=False, **kwargs):
+    def update_rule(self, rule_id=None, name=None, append=False, json=None, **kwargs):
         """
         Update triage rule
         :param rule_id: id of rule to update
@@ -1354,9 +1365,18 @@ class VectraBaseClient(object):
             "rdp_client_token",
             "keyboard_name",
         ]
-        deprecated_keys = []
 
-        rule.update(_generate_params(kwargs, valid_keys, deprecated_keys))
+        for k, v in kwargs.items():
+            if k in valid_keys:
+                if append:
+                    if isinstance(rule[k], list):
+                        rule[k] += v
+                    else:
+                        rule[k] = v
+                else:
+                    rule[k] = v
+            else:
+                raise ValueError(f"invalid parameter provided: {str(k)}")
 
         return self._request(
             method="put", url=f'{self.url}/rules/{rule["id"]}', json=rule
@@ -2041,9 +2061,12 @@ class VectraClientV2_1(VectraBaseClient):
         :rtype: dict
         """
         valid_keys = [
-            "enabled",
-            "priority",
-            "description",
+            "contains",
+            "fields",
+            "include_templates",
+            "page",
+            "page_size",
+            "ordering",
         ]
 
         deprecated_keys = []
@@ -2300,6 +2323,7 @@ class VectraClientV2_1(VectraBaseClient):
         is_whitelist=False,
         source_conditions=None,
         additional_conditions=None,
+        json=None,
         **kwargs,
     ):
         """
@@ -2370,39 +2394,37 @@ class VectraClientV2_1(VectraBaseClient):
         :param priority: used to determine order of triage filters (int) - optional
         :returns request object
         """
-        if not all([detection_category, detection_type, triage_category]):
-            raise ValueError("Missing required parameter")
+        if json is None:
+            if not all([detection_category, detection_type, triage_category]):
+                raise ValueError("Missing required parameter")
 
-        if detection_category.lower() not in [
-            "botnet activity",
-            "command & control",
-            "reconnaissance",
-            "lateral movement",
-            "exfiltration",
-        ]:
-            raise ValueError("detection_category not recognized")
+            if detection_category.lower() not in [
+                "botnet activity",
+                "command & control",
+                "reconnaissance",
+                "lateral movement",
+                "exfiltration",
+            ]:
+                raise ValueError("detection_category not recognized")
 
-        payload = {
-            "detection_category": detection_category,
-            "detection": detection_type,
-            "triage_category": triage_category,
-            "is_whitelist": is_whitelist,
-            "source_conditions": source_conditions,
-            "additional_conditions": additional_conditions,
-        }
+            payload = {
+                "detection_category": detection_category,
+                "detection": detection_type,
+                "triage_category": triage_category,
+                "is_whitelist": is_whitelist,
+                "source_conditions": source_conditions,
+                "additional_conditions": additional_conditions,
+            }
 
-        params = self._generate_rule_params(kwargs)
-
-        payload.update(params)
+        else:
+            payload = json
 
         return self._request(method="post", url=f"{self.url}/rules", json=payload)
 
     def update_rule(
         self,
         rule_id=None,
-        triage_category=None,
-        source_conditions=None,
-        additional_conditions=None,
+        json=None,
         **kwargs,
     ):
         """
@@ -2471,19 +2493,29 @@ class VectraClientV2_1(VectraBaseClient):
         :param enabled: is the rule currently enables (boolean) - optional - Not yet implemented!
         :returns request object
         """
+        if json is None:
+            if rule_id:
+                rule = self.get_rule_by_id(rule_id=rule_id).json()
+            else:
+                raise ValueError("rule id must be provided")
 
-        if rule_id:
-            rule = self.get_rule_by_id(rule_id=rule_id).json()
+            valid_keys = [
+                "description",
+                "priority",
+                "enabled",
+                "triage_category",
+                "is_whitelist",
+                "source_conditions",
+                "additional_conditions",
+            ]
+
+            for k, v in kwargs.items():
+                if k in valid_keys:
+                    rule[k] = v
+                else:
+                    raise ValueError(f"invalid parameter provided: {str(k)}")
         else:
-            raise ValueError("rule id must be provided")
-
-        rule["additional_conditions"] = additional_conditions
-        rule["source_conditions"] = source_conditions
-        rule["triage_category"] = triage_category
-
-        payload = self._generate_rule_params(kwargs)
-
-        rule.update(payload)
+            rule = json
 
         return self._request(method="put", url=f"{self.url}/rules/{rule_id}", json=rule)
 
@@ -3064,43 +3096,6 @@ class VectraClientV2_4(VectraClientV2_2):
             token=token,
             verify=verify,
         )
-
-    @staticmethod
-    def _generate_rule_params(args):
-        """
-        Generate query parameters for rules based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-
-        Valid params in the dict
-        :param name: name of rule to search (substring matching)
-        :param rule_id: ID of rule to return
-        :param contains:
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are: active_detections, all_hosts, category, created_timestamp, description,
-            enabled, flex1, flex2, flex3, flex4, flex5, flex6, host, host_group, id, identity, ip,
-            ip_group, is_whitelist, last_timestamp, priority, remote1_dns, remote1_dns_groups,
-            remote1_ip, remote1_ip_groups, remote1_kerb_account, remote1_kerb_service, remote1_port,
-            remote1_proto, remote2_dns, remote2_dns_groups, remote2_ip, remote2_ip_groups, remote2_port,
-            remote2_proto, sensor_luid, smart_category, template, total_detections, type_vname, url
-        :param include_templates: include rule templates, default is False
-        :param ordering: field used to sort response
-        :param page: page number to return (int)
-        :param page_size: number of object to return in response (int)
-        """
-        valid_keys = [
-            "contains",
-            "description",
-            "fields",
-            "include_templates",
-            "is_whitelist",
-            "page",
-            "page_size",
-            "ordering",
-        ]
-        deprecated_keys = []
-
-        return _generate_params(args, valid_keys, deprecated_keys)
 
     @staticmethod
     def _generate_group_params(args):
@@ -3727,4 +3722,30 @@ class VectraClientV2_5(VectraClientV2_4):
             headers=self.headers,
             json=payload,
             verify=self.verify,
+        )
+
+
+class V2_latest(VectraClientV2_5):
+    def __init__(
+        self,
+        user=None,
+        password=None,
+        token=None,
+        url=None,
+        client_id=None,
+        secret_key=None,
+        verify=False,
+    ):
+        """
+        Initialize Vectra client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param token: API token for authentication when using API v2*
+        :param verify: Verify SSL (default: False) - optional
+        """
+        super().__init__(
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            token=token,
+            verify=verify,
         )

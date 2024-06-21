@@ -21,9 +21,9 @@ pip install from pypi:
 ```
 pip install vectra_api_tools
 ```
-pip install develop branch from github:
+pip install from github:
 ```
-pip install git+https://github.com/vectranetworks/vectra_api_tools.git@develop
+pip install git+https://github.com/vectranetworks/vectra_api_tools.git
 ```
 source:
 ```
@@ -33,11 +33,11 @@ python setup.py install
 **Instantiation**
 * For v2
 ```
-import vat.vectra as detect
-detect_client = detect.VectraClientV2_5(url="",token="")
+from vat.vectra as V2_latest
+vectra_client = V2_latest(url="",token="")
 ```
 * For v3
 ```
-import vat.platform as platform
-platform_client = platform.VectraPlatformClientV3_3(url="",client_id="",secret_key="")
+from vat.platform as V3_latest
+vectra_client = V3_latest(url="",client_id="",secret_key="")
 ```
