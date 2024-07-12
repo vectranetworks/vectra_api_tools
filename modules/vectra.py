@@ -3725,7 +3725,7 @@ class VectraClientV2_5(VectraClientV2_4):
         )
 
 
-class V2_latest(VectraClientV2_5):
+class ClientV2_latest(VectraClientV2_5):
     def __init__(
         self,
         user=None,

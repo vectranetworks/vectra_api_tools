@@ -1203,7 +1203,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             raise HTTPException(response)
 
 
-class V3_latest(VectraPlatformClientV3_3):
+class ClientV3_latest(VectraPlatformClientV3_3):
     def __init__(
         self,
         user=None,
