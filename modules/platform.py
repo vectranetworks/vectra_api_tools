@@ -1201,3 +1201,30 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
                     return {}
         else:
             raise HTTPException(response)
+
+
+class ClientV3_latest(VectraPlatformClientV3_3):
+    def __init__(
+        self,
+        user=None,
+        password=None,
+        token=None,
+        url=None,
+        client_id=None,
+        secret_key=None,
+        verify=False,
+    ):
+        """
+        Initialize Vectra Platform client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param client_id: API Client ID for authentication - required
+        :param secret_key: API Secret Key for authentication - required
+        :param verify: Verify SSL (default: False) - optional
+        """
+        super().__init__(
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            token=token,
+            verify=verify,
+        )
