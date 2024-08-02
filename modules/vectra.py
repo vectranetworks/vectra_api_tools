@@ -52,6 +52,11 @@ class HTTPTooManyRequestsException(HTTPException):
         super().__init__(response)
 
 
+class HTTPContentTooLargeException(HTTPException):
+    def __init__(self, response):
+        super().__init__(response)
+
+
 def request_error_handler(func):
     def request_handler(self, *args, **kwargs):
         response = func(self, *args, **kwargs)
@@ -59,6 +64,8 @@ def request_error_handler(func):
             return response
         elif response.status_code == 401:
             raise HTTPUnauthorizedException(response)
+        elif response.status_code == 413:
+            raise HTTPContentTooLargeException(response)
         elif response.status_code == 422:
             raise HTTPTUnprocessableContentException(response)
         elif response.status_code == 429:
@@ -2545,7 +2552,7 @@ class VectraClientV2_1(VectraBaseClient):
             params=self._generate_detect_usage_params(kwargs),
         )
 
-    @validate_gte_api_v2
+    @validate_api_v2
     def get_audits(self, start_date=None, end_date=None):
         """
         Get audits between start_date and end_date, inclusive

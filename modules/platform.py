@@ -343,7 +343,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         return _generate_params(args, valid_keys, deprecated_keys)
 
     @staticmethod
-    def _generate_audit_log_params(args):
+    def _generate_audit_params(args):
         """
         Generate query parameters for accounts based on provided args
         :param args: dict of keys to generate query params
@@ -419,6 +419,16 @@ class VectraPlatformClientV3(VectraClientV2_5):
             method="get",
             url=f"{self.url}/events/account_detection",
             params=self._generate_account_event_params(kwargs),
+        )
+
+    def get_audits(self, **kwargs):
+        """
+        see _generate_audit_params for available parameters
+        """
+        return self._request(
+            method="get",
+            url=f"{self.url}/events/audits",
+            params=self._generate_audit_params(kwargs),
         )
 
 
