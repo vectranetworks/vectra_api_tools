@@ -1,3 +1,5 @@
+.gitignore
+test.py
 .DS_Store
 test/.DS*
 .pdm-python

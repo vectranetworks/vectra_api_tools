@@ -42,7 +42,7 @@ class HTTPUnauthorizedException(HTTPException):
         super().__init__(response)
 
 
-class HTTPTUnprocessableContentException(HTTPException):
+class HTTPUnprocessableContentException(HTTPException):
     def __init__(self, response):
         super().__init__(response)
 
@@ -60,7 +60,7 @@ def request_error_handler(func):
         elif response.status_code == 401:
             raise HTTPUnauthorizedException(response)
         elif response.status_code == 422:
-            raise HTTPTUnprocessableContentException(response)
+            raise HTTPUnprocessableContentException(response)
         elif response.status_code == 429:
             raise HTTPTooManyRequestsException(response)
         else:
@@ -87,10 +87,14 @@ def param_deprecation(key):
 
 def _generate_params(args, valid_keys, deprecated_keys):
     params = {}
+    param_overrides = {"checkpoint": "from"}
     for k, v in args.items():
         if k in valid_keys:
             if v is not None:
-                params[k] = v
+                if k in param_overrides:
+                    params[param_overrides[k]] = v
+                else:
+                    params[k] = v
         else:
             raise ValueError(f"argument {str(k)} is an invalid query parameter")
         if k in deprecated_keys:
@@ -190,7 +194,7 @@ class VectraBaseClient(object):
         *Either client_id, token, or user are required
         """
         self.verify = verify
-
+        self.timeout = 5
         url = _format_url(url)
         if client_id and secret_key and self.VERSION3 is not None:
             self.version = self.VERSION3
@@ -245,11 +249,21 @@ class VectraBaseClient(object):
 
         if self.version >= 2:
             return requests.request(
-                method=method, url=url, headers=headers, verify=self.verify, **kwargs
+                method=method,
+                url=url,
+                headers=headers,
+                verify=self.verify,
+                timeout=self.timeout,
+                **kwargs,
             )
         else:
             return requests.request(
-                method=method, url=url, auth=self.auth, verify=self.verify, **kwargs
+                method=method,
+                url=url,
+                auth=self.auth,
+                verify=self.verify,
+                timeout=self.timeout,
+                **kwargs,
             )
 
     @staticmethod
@@ -2545,7 +2559,7 @@ class VectraClientV2_1(VectraBaseClient):
             params=self._generate_detect_usage_params(kwargs),
         )
 
-    @validate_gte_api_v2
+    @validate_api_v2
     def get_audits(self, start_date=None, end_date=None):
         """
         Get audits between start_date and end_date, inclusive
