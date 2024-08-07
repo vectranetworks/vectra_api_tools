@@ -33,11 +33,11 @@ python setup.py install
 **Instantiation**
 * For v2
 ```
-from vat.vectra as ClientV2_latest
+from vat.vectra import ClientV2_latest
 vectra_client = ClientV2_latest(url="",token="")
 ```
 * For v3
 ```
-from vat.platform as ClientV3_latest
+from vat.platform import ClientV3_latest
 vectra_client = ClientV3_latest(url="",client_id="",secret_key="")
 ```

@@ -337,13 +337,13 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :param args: dict of keys to generate query params
         :rtype: dict
         """
-        valid_keys = ["from", "limit"]
+        valid_keys = ["checkpoint", "limit"]
         deprecated_keys = []
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
     @staticmethod
-    def _generate_audit_log_params(args):
+    def _generate_audit_params(args):
         """
         Generate query parameters for accounts based on provided args
         :param args: dict of keys to generate query params
@@ -352,7 +352,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         valid_keys = [
             "event_timestamp_gte",
             "event_timestamp_lte",
-            "from",
+            "checkpoint",
             "user_id",
             "event_object",
             "event_action",
@@ -400,7 +400,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
     def get_account_scoring(self, **kwargs):
         """
         Get account scoring
-        :param from:
+        :param checkpoint:
         :param limit:
         """
         return self._request(
@@ -412,13 +412,56 @@ class VectraPlatformClientV3(VectraClientV2_5):
     def get_account_detection(self, **kwargs):
         """
         Get account detection
-        :param from:
+        :param checkpoint:
         :param limit:
         """
         return self._request(
             method="get",
             url=f"{self.url}/events/account_detection",
             params=self._generate_account_event_params(kwargs),
+        )
+
+    def get_all_audits(self, **kwargs):
+        """
+        Get audits
+        :param event_timestamp_gte:
+        :param event_timestamp_lte:
+        :param checkpoint:
+        :param user_id:
+        :param event_object:
+        :param event_action:
+        :param limit:
+        """
+        resp = self._request(
+            method="get",
+            url=f"{self.url}/events/audits",
+            params=self._generate_audit_params(kwargs),
+        )
+        yield resp
+        while resp.json()["remaining_count"] > 0:
+            kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+            resp = self._request(
+                method="get",
+                url=f"{self.url}/events/audits",
+                params=self._generate_audit_params(kwargs),
+            )
+            yield resp
+
+    def get_audits(self, **kwargs):
+        """
+        Get audits
+        :param event_timestamp_gte:
+        :param event_timestamp_lte:
+        :param checkpoint:
+        :param user_id:
+        :param event_object:
+        :param event_action:
+        :param limit:
+        """
+        return self._request(
+            method="get",
+            url=f"{self.url}/events/audits",
+            params=self._generate_audit_params(kwargs),
         )
 
 
@@ -488,7 +531,7 @@ class VectraPlatformClientV3_1(VectraPlatformClientV3):
             "type",
             "entity_type",
             "include_score_decreases",
-            "from",
+            "checkpoint",
             "limit",
             "event_timestamp_gte",
         ]
@@ -550,7 +593,7 @@ class VectraPlatformClientV3_1(VectraPlatformClientV3):
     def get_entity_scoring(self, **kwargs):
         """
         :param include_score_decreases:
-        :param from:
+        :param checkpoint:
         :param limit:
         :param event_timestamp_gte:
         """
@@ -735,7 +778,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
     def _generate_detection_events_params(args):
         """
         Generate query parameters for detection events based on provided args
-        :param from:
+        :param checkpoint:
         :param limit:
         :param event_timestamp_gte
         :param event_timestamp_lte
@@ -746,7 +789,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param detection_id
         """
         valid_keys = [
-            "from",
+            "checkpoint",
             "limit",
             "event_timestamp_gte",
             "event_timestamp_lte",
@@ -1152,10 +1195,38 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             "This function has been deprecated in the Vectra API client v3.3. Please use get_detection_events()"
         )
 
+    def get_all_detection_events(self, **kwargs):
+        """
+        Get detection events
+        :param checkpoint:
+        :param limit:
+        :param event_timestamp_gte
+        :param event_timestamp_lte
+        :param type
+        :param entity_type
+        :param include_info_category
+        :param include_triaged
+        :param detection_id
+        """
+        resp = self._request(
+            method="get",
+            url=f"{self.url}/events/detections",
+            params=self._generate_detection_events_params(kwargs),
+        )
+        yield resp
+        while resp.json()["remaining_count"] > 0:
+            kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+            resp = self._request(
+                method="get",
+                url=f"{self.url}/events/detections",
+                params=self._generate_detection_events_params(kwargs),
+            )
+            yield resp
+
     def get_detection_events(self, **kwargs):
         """
         Get detection events
-        :param from:
+        :param checkpoint:
         :param limit:
         :param event_timestamp_gte
         :param event_timestamp_lte
