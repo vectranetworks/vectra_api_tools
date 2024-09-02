@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import sys
@@ -174,8 +175,13 @@ class VectraPlatformClientV3(VectraClientV2_5):
                 raise TooManyRequestException("Too many requests.")
             if resp.status_code == 200:
                 logging.info("Access token is generated.")
-                self._access = resp.json().get("access_token")
-                self._refresh = resp.json().get("refresh_token")
+                token_data = resp.json()
+                self._access = token_data.get("access_token")
+                self._refresh = token_data.get("refresh_token")
+                token_data['gen_time'] = round(time.time())
+                logging.info("Writing token data to file!")
+                with open('/tmp/rux_token_file', 'w') as f:
+                    json.dump(token_data, f)
                 self._accessTime = (
                     int(time.time()) + resp.json().get("expires_in") - 100
                 )
@@ -204,6 +210,22 @@ class VectraPlatformClientV3(VectraClientV2_5):
             logging.error(f"An exception occurred: {e}")
 
     def _check_token(self):
+        token_file = '/tmp/rux_token_file'
+        if os.path.isfile(token_file):
+            logging.info("Token file found!")
+            with open(token_file, 'r') as infile:
+                token_data = json.load(infile)
+            if token_data['gen_time'] + token_data['expires_in'] > round(time.time()) + 600:
+                logging.info("Bearer token valid!")
+
+                self._access = token_data['access_token']
+                self._accessTime = token_data['gen_time'] + token_data['expires_in']
+            else:
+                logging.info("Bearer token expiring. Refreshing!!")
+                if token_data['gen_time'] + token_data['refresh_expires_in'] > round(time.time()) + 600:
+                    self._refresh = token_data['refresh_token']
+                    self._refresh_token()
+
         if not self._access:
             self._get_token()
         elif self._accessTime < int(time.time()):
