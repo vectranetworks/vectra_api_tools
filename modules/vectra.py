@@ -42,6 +42,11 @@ class HTTPUnauthorizedException(HTTPException):
         super().__init__(response)
 
 
+class HTTPRequestEntityTooLarge(HTTPException):
+    def __init__(self, response):
+        super().__init__(response)
+
+
 class HTTPUnprocessableContentException(HTTPException):
     def __init__(self, response):
         super().__init__(response)
@@ -59,6 +64,8 @@ def request_error_handler(func):
             return response
         elif response.status_code == 401:
             raise HTTPUnauthorizedException(response)
+        elif response.status_code == 413:
+            raise HTTPRequestEntityTooLarge(response)
         elif response.status_code == 422:
             raise HTTPUnprocessableContentException(response)
         elif response.status_code == 429:
@@ -194,7 +201,7 @@ class VectraBaseClient(object):
         *Either client_id, token, or user are required
         """
         self.verify = verify
-        self.timeout = 5
+        self.timeout = 30
         url = _format_url(url)
         if client_id and secret_key and self.VERSION3 is not None:
             self.version = self.VERSION3

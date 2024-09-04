@@ -432,19 +432,21 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :param event_action:
         :param limit:
         """
-        resp = self._request(
-            method="get",
-            url=f"{self.url}/events/audits",
-            params=self._generate_audit_params(kwargs),
-        )
+        # resp = self._request(
+        #     method="get",
+        #     url=f"{self.url}/events/audits",
+        #     params=self._generate_audit_params(kwargs),
+        # )
+        resp = self.get_audits(**kwargs)
         yield resp
         while resp.json()["remaining_count"] > 0:
             kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-            resp = self._request(
-                method="get",
-                url=f"{self.url}/events/audits",
-                params=self._generate_audit_params(kwargs),
-            )
+            # resp = self._request(
+            #     method="get",
+            #     url=f"{self.url}/events/audits",
+            #     params=self._generate_audit_params(kwargs),
+            # )
+            resp = self.get_audits(**kwargs)
             yield resp
 
     def get_audits(self, **kwargs):
@@ -699,6 +701,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :rtype: dict
         """
         valid_keys = [
+            "fields",
             "page",
             "page_size",
             "ordering",
