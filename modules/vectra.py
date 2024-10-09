@@ -1707,6 +1707,10 @@ class VectraBaseClient(object):
         :param duration: days that the threat feed will be applied
         :returns: request object
         """
+        category = category.lower()
+        certainty = certainty.capitalize()
+        itype = itype.capitalize()
+
         if category not in ["lateral", "exfil", "cnc"]:
             raise ValueError(f"Invalid category provided: {category}")
 
