@@ -27,6 +27,17 @@ def test_entity_generator(vc, test_skip):
     assert results.json()["count"] >= 1
 
 
+def test_entity_threaded(vc, test_skip):
+    count = next(vc.get_all_entities(page_size=1)).json()["count"]
+    vc.threads = 8
+    entity_gen = []
+    for results in vc.get_all_entities(page_size=50):
+        entity_gen = entity_gen + results.json()["results"]
+
+    assert count == len(entity_gen)
+    vc.threads = 1
+
+
 def test_get_entity_id(vc, test_skip):
     entity = next(vc.get_all_entities()).json()["results"][0]
     entity_id = entity["id"]

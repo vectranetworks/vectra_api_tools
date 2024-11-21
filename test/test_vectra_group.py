@@ -21,6 +21,17 @@ def test_get_group_generator(vc, test_skip):
     assert results.json()["count"] >= 1
 
 
+def test_groups_threaded(vc, test_skip):
+    count = next(vc.get_all_groups(page_size=1)).json()["count"]
+    vc.threads = 8
+    group_gen = []
+    for results in vc.get_all_groups(page_size=50):
+        group_gen = group_gen + results.json()["results"]
+
+    assert count == len(group_gen)
+    vc.threads = 1
+
+
 def test_create_group(vc, test_skip):
     resp = vc.create_group(
         name="pytest group",

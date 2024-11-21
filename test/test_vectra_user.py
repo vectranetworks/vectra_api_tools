@@ -21,6 +21,18 @@ def test_get_user_generator(vc, test_skip):
     assert results.json()["count"] >= 1
 
 
+def test_user_threaded(vc, test_skip):
+    count = next(vc.get_all_users()).json()["count"]
+    vc.threads = 8
+    user_gen = []
+    for results in vc.get_all_users():
+        user_gen = user_gen + results.json()["results"]
+
+    # assert len(results.json()["results"]) == 1
+    assert count == len(user_gen)
+    vc.threads = 1
+
+
 def test_get_user_by_username(vc, test_skip):
     user = next(vc.get_all_users()).json()["results"][0]
     username = user["username"]

@@ -22,6 +22,17 @@ def test_host_generator(vc, test_skip):
     assert results.json()["count"] >= 1
 
 
+def test_hosts_threaded(vc, test_skip):
+    count = next(vc.get_all_hosts(page_size=1)).json()["count"]
+    vc.threads = 8
+    host_gen = []
+    for results in vc.get_all_hosts(page_size=50):
+        host_gen = host_gen + results.json()["results"]
+
+    assert count == len(host_gen)
+    vc.threads = 1
+
+
 def test_get_hosts_id(vc, test_skip):
 
     host_id = next(vc.get_all_hosts()).json()["results"][0]["id"]

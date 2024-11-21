@@ -1,12 +1,13 @@
+import concurrent.futures
 import json
 import logging
 import sys
 import time
 import warnings
+from pathlib import Path
 
 import backoff
 import requests
-
 from vat.vectra import (
     HTTPException,
     VectraClientV2_5,
@@ -29,6 +30,16 @@ class TooManyRequestException(Exception):
 def kill_process_and_exit(e):
     logging.error("Exiting current process.")
     sys.exit()
+
+
+def validate_lte_api_v3_4(func):
+    def api_validator(self, *args, **kwargs):
+        if self.version < 3.4:
+            return func(self, *args, **kwargs)
+        else:
+            raise NotImplementedError("Method is not accessible via v3.4+ of API")
+
+    return api_validator
 
 
 class VectraPlatformClientV3(VectraClientV2_5):
@@ -184,8 +195,6 @@ class VectraPlatformClientV3(VectraClientV2_5):
                 )
         except CustomException as e:
             logging.error(f"Error occurred: {e}")
-            logging.info("Exiting current execution")
-            sys.exit()
         except TooManyRequestException as e:
             logging.info(
                 f"{e}. Retrying after {int(resp.headers.get('Retry-After'))} seconds."
@@ -242,6 +251,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
             "destination",
             "proto",
             "is_targeting_key_asset",
+            "is_triaged",
             "note_modified_timestamp_gte",
             "src_account",
             "id",
@@ -362,6 +372,28 @@ class VectraPlatformClientV3(VectraClientV2_5):
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
+    def get_threaded_events(self, url, count, **kwargs):
+
+        limit = kwargs.pop("limit")
+        checkpoint = kwargs.pop("checkpoint")
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.threads, thread_name_prefix="Get All Generator"
+        ) as executor:
+            try:
+                results = {
+                    executor.submit(
+                        self._request,
+                        method="get",
+                        url=url + f"?from={next_checkpoint}&limit={limit}",
+                        params=kwargs,
+                    ): next_checkpoint
+                    for next_checkpoint in range(checkpoint, count + limit, limit)
+                }
+                for result in concurrent.futures.as_completed(results):
+                    yield result.result()
+            except KeyboardInterrupt:
+                executor.shutdown(wait=False, cancel_futures=True)
+
     # Start Platform Methods
     def get_detection_note_by_id(self, detection_id=None, note_id=None):
         """
@@ -431,23 +463,34 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :param event_object:
         :param event_action:
         :param limit:
+        :param ordering:
         """
-        # resp = self._request(
-        #     method="get",
-        #     url=f"{self.url}/events/audits",
-        #     params=self._generate_audit_params(kwargs),
-        # )
+        try:
+            limit = kwargs.pop("limit")
+        except KeyError:
+            limit = 500
+
+        if limit >= 1000:
+            limit = 1000
+        elif limit <= 0:
+            limit = 1
+
+        kwargs["limit"] = limit
         resp = self.get_audits(**kwargs)
         yield resp
-        while resp.json()["remaining_count"] > 0:
-            kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-            # resp = self._request(
-            #     method="get",
-            #     url=f"{self.url}/events/audits",
-            #     params=self._generate_audit_params(kwargs),
-            # )
-            resp = self.get_audits(**kwargs)
-            yield resp
+
+        if self.threads == 1:
+            while resp.json()["remaining_count"] > 0:
+                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+                resp = self.get_audits(**kwargs)
+                yield resp
+        else:
+            count = resp.json()["remaining_count"]
+            if count > 0:
+                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+                yield from self.get_threaded_events(
+                    f"{self.url}/events/audits", count, **kwargs
+                )
 
     def get_audits(self, **kwargs):
         """
@@ -459,6 +502,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :param event_object:
         :param event_action:
         :param limit:
+        :param ordering:
         """
         return self._request(
             method="get",
@@ -556,15 +600,21 @@ class VectraPlatformClientV3_1(VectraPlatformClientV3):
         :param state:
         :param tags:
         """
+        url = f"{self.url}/entities"
+        params = self._generate_entity_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/entities",
-            params=self._generate_entity_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     def get_entity_by_id(self, entity_id=None, **kwargs):
         """
@@ -758,7 +808,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         return params
 
     @staticmethod
-    def _generate_vectramatch_params(args):
+    def _generate_match_params(args):
         """
         Generate query parameters for groups based on provided args
         :param args: dict of keys to generate query params
@@ -769,7 +819,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             "device_serials",
             "desired_state",
             "uuid",
-            "file",
+            "file_path",
             "notes",
         ]
 
@@ -801,166 +851,12 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             "include_info_category",
             "include_triaged",
             "detection_id",
+            "ordering",
         ]
 
         deprecated_keys = []
 
         return _generate_params(args, valid_keys, deprecated_keys)
-
-    def get_vectramatch_enablement(self, **kwargs):
-        """
-        Determine enablement state of desired device
-        :param device_serial: serial number of device (required)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "device_serial" not in params():
-            raise ValueError("Device serial number is required.")
-        resp = self._request(
-            method="get", url=f"{self.url}/vectra-match/enablement", params=params
-        )
-        return resp
-
-    def set_vectramatch_enablement(self, **kwargs):
-        """
-        Set desired enablement state of device
-        :param device_serial: serial number of device (required)
-        :param desired_state: boolean True or False (required)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "device_serial" not in params():
-            raise ValueError("Device serial number is required.")
-
-        if "desired_state" not in params():
-            raise ValueError("Desired state is required (boolean).")
-        resp = self._request(
-            method="post", url=f"{self.url}/vectra-match/enablement", json=params
-        )
-        return resp
-
-    def get_vectramatch_stats(self, **kwargs):
-        """
-        Retrieve vectra-match stats
-        :param device_serial: serial number of device (optional)
-        """
-        resp = self._request(
-            method="get",
-            url=f"{self.url}/vectra-match/stats",
-            params=self._generate_vectramatch_params(kwargs),
-        )
-        return resp
-
-    def get_vectramatch_status(self, **kwargs):
-        """
-        Retrieve vectra-match status
-        :param device_serial: serial number of device (optional)
-        """
-        resp = self._request(
-            method="get",
-            url=f"{self.url}/vectra-match/status",
-            params=self._generate_vectramatch_params(kwargs),
-        )
-        return resp
-
-    def get_vectramatch_available_devices(self):
-        """
-        Retrieve devices that can be enabled for vectra-match
-        """
-        resp = self._request(
-            method="get", url=f"{self.url}/vectra-match/available-devices"
-        )
-        return resp
-
-    def get_vectramatch_rules(self, **kwargs):
-        """
-        Retrieve vectra-match rules
-        :param uuid: uuid of an uploaded ruleset (required)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params():
-            raise ValueError("Ruleset uuid must be provided.")
-        resp = self._request(
-            method="get", url=f"{self.url}/vectra-match/rules", params=params
-        )
-        return resp
-
-    def upload_vectramatch_rules(self, **kwargs):
-        """
-        Upload vectra-match rules
-        :param file: name of ruleset desired to be uploaded (required)
-        :param notes: notes about the uploaded file (optional)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "file" not in params():
-            raise ValueError("A ruleset filename is required.")
-        if "notes" not in params():
-            params["notes"] = ""
-        headers = {"Authorization": self.headers["Authorization"]}
-        resp = self._request(
-            method="post",
-            url=f"{self.url}/vectra-match/rules",
-            headers=headers,
-            files={"file": open(f"{params['file']}", "rb")},
-            data={"notes": params["notes"]},
-        )
-        return resp
-
-    def delete_vectramatch_rules(self, **kwargs):
-        """
-        Retrieve vectra-match rules
-        :param uuid: uuid of an uploaded ruleset (required)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params():
-            raise ValueError(
-                "Must provide the uuid of the desired ruleset to be deleted."
-            )
-        resp = self._request(
-            method="delete", url=f"{self.url}/vectra-match/rules", json=params
-        )
-        return resp
-
-    def get_vectramatch_assignment(self):
-        """
-        Retrieve ruleset assignments for vectra-match
-        """
-        resp = self._request(method="get", url=f"{self.url}/vectra-match/assignment")
-        return resp
-
-    def set_vectramatch_assignment(self, **kwargs):
-        """
-        Assign ruleset to device
-        :param uuid: uuid of the ruleset to be assigned (required)
-        :param device_serials: list of devices to assign the ruleset (required)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params():
-            raise ValueError("Must provide the ruleset uuid")
-        if "device_serials" not in params():
-            raise ValueError(
-                "Must provide the serial number(s) of the device(s) to be assigned."
-            )
-        elif not isinstance(params["device_serials"], list):
-            params["device_serials"] = params["device_serials"].split(",")
-        resp = self._request(
-            method="post", url=f"{self.url}/vectra-match/assignment", json=params
-        )
-        return resp
-
-    def delete_vectramatch_assignment(self, **kwargs):
-        """
-        Assign ruleset to device
-        :param uuid: uuid of the ruleset to be assigned (required)
-        :param device_serial: serial of device (required)
-        """
-        params = self._generate_vectramatch_params(kwargs)
-        if "uuid" not in params():
-            raise ValueError("Must provide the ruleset uuid")
-        if "device_serial" not in params():
-            raise ValueError("Must provide the device serial number.")
-        resp = self._request(
-            method="delete", url=f"{self.url}/vectra-match/assignment", json=params
-        )
-        return resp
 
     def get_entity_tags(self, entity_id=None, **kwargs):
         """
@@ -1188,11 +1084,13 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             params=params,
         )
 
+    @validate_lte_api_v3_4
     def get_account_scoring(self, **kwargs):
         raise DeprecationWarning(
             "This function has been deprecated in the Vectra API client v3.3. Please use get_entity_scoring()"
         )
 
+    @validate_lte_api_v3_4
     def get_account_detection(self, **kwargs):
         raise DeprecationWarning(
             "This function has been deprecated in the Vectra API client v3.3. Please use get_detection_events()"
@@ -1211,20 +1109,39 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param include_triaged
         :param detection_id
         """
+        try:
+            limit = kwargs.pop("limit")
+        except KeyError:
+            limit = 500
+
+        if limit >= 1000:
+            limit = 1000
+        elif limit <= 0:
+            limit = 1
+
+        kwargs["limit"] = limit
         resp = self._request(
             method="get",
             url=f"{self.url}/events/detections",
             params=self._generate_detection_events_params(kwargs),
         )
         yield resp
-        while resp.json()["remaining_count"] > 0:
-            kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-            resp = self._request(
-                method="get",
-                url=f"{self.url}/events/detections",
-                params=self._generate_detection_events_params(kwargs),
-            )
-            yield resp
+        if self.threads == 1:
+            while resp.json()["remaining_count"] > 0:
+                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+                resp = self._request(
+                    method="get",
+                    url=f"{self.url}/events/detections",
+                    params=self._generate_detection_events_params(kwargs),
+                )
+                yield resp
+        else:
+            count = resp.json()["remaining_count"]
+            if count > 0:
+                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+                yield from self.get_threaded_events(
+                    f"{self.url}/events/detections", count, **kwargs
+                )
 
     def get_detection_events(self, **kwargs):
         """
@@ -1256,28 +1173,465 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             params=_generate_params(kwargs, valid_keys, deprecated_keys),
         )
 
-    def get_feed_by_name(self, name=None):
-        """
-        Gets configured threat feed by name (used in conjunction with updating and deleting feeds)
-        :param name: name of threat feed
-        """
-        try:
-            response = self._request(method="get", url=f"{self.url}/threatFeeds")
-        except requests.ConnectionError:
-            raise Exception("Unable to connect to remote host")
+    def download_vectra_ruleset(self, filename=None):
+        if filename is None:
+            filename = "curated.rules"
+        elif not isinstance(filename, str):
+            filename = "curated.rules"
+            raise TypeError(
+                "Filename must be of type str. File is being named 'curated.rules'."
+            )
 
-        if response.status_code == 200:
-            for feed in response.json()["results"]:
-                if feed != []:
-                    if feed["name"].lower() == name.lower():
-                        return feed
-                else:
-                    return {}
+        p = Path(filename)
+        p.parent.mkdir(parents=True, exist_ok=True)
+
+        resp = self._request(
+            method="get", url=self.url + "/vectra-match/download-vectra-ruleset"
+        )
+
+        resp = requests.get(url=resp.json()["download_url"])
+
+        with open(str(filename), "wb") as file:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    file.write(chunk)
+        return resp
+
+    def upload_match_ruleset(self, **kwargs):
+        """
+        Upload vectra-match rules
+        :param file: name of ruleset desired to be uploaded (required)
+        :param notes: notes about the uploaded file (optional)
+        """
+        params = self._generate_vectramatch_params(kwargs)
+        if not params.get("file_path"):
+            raise ValueError("A ruleset filename is required.")
+        params["notes"] = params.get("notes", "")
+        headers = {"Authorization": self.headers["Authorization"]}
+
+        # Get the upload url
+        resp = self._request(
+            method="post",
+            url=f"{self.url}/vectra-match/rules/upload/",
+            headers=headers,
+            json={"file_name": params["file"], "notes": params["notes"]},
+        )
+
+        upload_url = resp.json()["urls"][0]
+        upload_id = resp.json()["id"]
+
+        # Upload the file to the provided url
+        payload = open(f"{params['file']}", "rb")
+        resp = requests.put(upload_url, data=payload)
+
+        if resp.status_code == 200:
+            # Patch the request
+            resp = self._request(
+                method="patch",
+                url=f"{self.url}/vectra-match/rules/upload/{upload_id}",
+                json={"upload_status": "completed"},
+            )
+
+        if resp.status_code == 200:
+            while True:
+                resp = self._request(
+                    method="get",
+                    url=f"{self.url}/vectra-match/rules/upload/{upload_id}",
+                )
+                if resp.json()["external_task_status"] != "in_progress":
+                    break
+                time.sleep(5)
+
+        return resp
+
+
+class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
+    VERSION3 = 3.4
+    VERSION2 = None
+    VERSION1 = None
+
+    def __init__(
+        self,
+        user=None,
+        password=None,
+        token=None,
+        url=None,
+        client_id=None,
+        secret_key=None,
+        verify=False,
+    ):
+        """
+        Initialize Vectra Platform client
+        :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
+        :param client_id: API Client ID for authentication - required
+        :param secret_key: API Secret Key for authentication - required
+        :param verify: Verify SSL (default: False) - optional
+        """
+        super().__init__(
+            url=url,
+            client_id=client_id,
+            secret_key=secret_key,
+            token=token,
+            verify=verify,
+        )
+
+    @staticmethod
+    def _generate_entity_params(args):
+        """
+        Generate query parameters for detections based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        valid_keys = [
+            "is_prioritized",
+            "type",
+            "ordering",
+            "last_detection_timestamp_gte",
+            "name",
+            "note_modified_timestamp_gte",
+            "page",
+            "page_size",
+            "state",
+            "tags",
+        ]
+
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
+    def _generate_entity_scoring_params(args):
+        """
+        Generate query parameters for detections based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        valid_keys = [
+            "type",
+            "include_score_decreases",
+            "checkpoint",
+            "limit",
+            "event_timestamp_gte",
+        ]
+
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
+    def _generate_detection_events_params(args):
+        """
+        Generate query parameters for detection events based on provided args
+        :param checkpoint:
+        :param limit:
+        :param event_timestamp_gte
+        :param event_timestamp_lte
+        :param type
+        :param include_info_category
+        :param include_triaged
+        :param detection_id
+        """
+        valid_keys = [
+            "checkpoint",
+            "limit",
+            "event_timestamp_gte",
+            "event_timestamp_lte",
+            "type",
+            "include_info_category",
+            "include_triaged",
+            "detection_id",
+            "ordering",
+        ]
+
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
+    def _generate_detection_params(args):
+        """
+        Generate query parameters for detections based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+        valid_keys = [
+            "fields",
+            "page",
+            "page_size",
+            "ordering",
+            "min_id",
+            "max_id",
+            "state",
+            "detection_type",
+            "detection_category",
+            "src_ip",
+            "threat_score",
+            "threat_gte",
+            "certainty",
+            "certainty_gte",
+            "last_timestamp",
+            "host_id",
+            "tags",
+            "destination",
+            "proto",
+            "is_targeting_key_asset",
+            "is_triaged",
+            "note_modified_timestamp_gte",
+            "src_account",
+            "id",
+        ]
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
+    def _generate_user_params(args):
+        valid_keys = ["page", "page_size", "email", "role", "last_login_gte"]
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
+    def _generate_group_params(args):
+        """
+        Generate query parameters for groups based on provided args
+        :param args: dict of keys to generate query params
+        :rtype: dict
+        """
+
+        valid_keys = [
+            "account_ids",
+            "account_names",
+            "host_ids",
+            "importance",
+            "description",
+            "last_modified_timestamp",
+            "last_modified_by",
+            "name",
+            "page_size",
+            "type",
+            "is_regex",
+            "is_membership_evaluation_ongoing",
+            "include_members",
+        ]
+
+        deprecated_keys = []
+
+        params = _generate_params(args, valid_keys, deprecated_keys)
+        return params
+
+    def create_group(self, **kwargs):
+        if not (name := kwargs.get("name")):
+            raise ValueError("Missing required parameter: name")
+
+        if "members" in kwargs and "regex" in kwargs:
+            raise ValueError("Members cannot be specified when creating a regex group.")
+        elif members := kwargs.get("members"):
+            regex = None
+        elif regex := kwargs.get("regex"):
+            members = []
         else:
-            raise HTTPException(response)
+            members = []
+            regex = None
+
+        importance = kwargs.get("importance", "medium")
+        description = kwargs.get("description", "")
+
+        if regex is None and (type := kwargs.get("type", "")) not in [
+            "host",
+            "domain",
+            "ip",
+            "account",
+        ]:
+            raise ValueError(
+                'parameter type must have value "account", "domain", "ip" or "host"'
+            )
+        elif (type := kwargs.get("type", "")) not in ["host", "account"]:
+            raise ValueError('parameter type must have value "account" or "host"')
+        rules = kwargs.get("rules", [])
+        if not isinstance(members, list):
+            raise TypeError("members must be type: list")
+        if not isinstance(rules, list):
+            raise TypeError("rules must be type: list")
+
+        if regex is None:
+            # Static POST body
+            payload = {
+                "name": name,
+                "description": description,
+                "type": type,
+                "members": members,
+                "importance": importance,
+            }
+        else:
+            # Dynamic POST body
+            payload = {
+                "name": name,
+                "description": description,
+                "type": type,
+                "importance": importance,
+                "regex": regex,
+            }
+
+        return self._request(
+            method="post",
+            url=f"{self.url}/groups",
+            headers=self.headers,
+            json=payload,
+        )
+
+    def update_group(self, group_id=None, **kwargs):
+        group = self.get_group_by_id(group_id=group_id).json()
+
+        if members := kwargs.get("members"):
+            if kwargs.get("regex"):
+                raise ValueError(
+                    "Members cannot be specified when creating a regex group."
+                )
+            else:
+                regex = None
+        elif regex := kwargs.get("regex"):
+            pass
+        else:
+            members = group["members"]
+            regex = None
+
+        name = kwargs.get("name", group["name"])
+        description = kwargs.get("description", group["description"])
+        importance = kwargs.get("importance", group["importance"])
+
+        if regex is None:
+            # Static POST body
+            payload = {
+                "name": name,
+                "description": description,
+                "members": members,
+                "importance": importance,
+            }
+        else:
+            # Dynamic POST body
+            payload = {
+                "name": name,
+                "description": description,
+                "importance": importance,
+                "regex": regex,
+            }
+
+        return self._request(
+            method="patch",
+            url=f"{self.url}/groups/{group_id}",
+            headers=self.headers,
+            json=payload,
+        )
+
+    def get_health_check(self, check=None, cache=True, vlans=True):
+        """
+        Get health statistics for the appliance
+        :param check: specific check to run - optional
+            possible values are: cpu, disk, hostid, memory, network, power, sensors, system
+        :param cache: (bool) - optional
+        :param vlans: (bool) - optional
+        """
+
+        if check is None:
+            return self._request(
+                method="get",
+                url=f"{self.url}/health",
+                params={"cache": cache, "vlans": vlans},
+            )
+        else:
+            if check not in [
+                "network",
+                "system",
+                "memory",
+                "sensors",
+                "hostid",
+                "disk",
+                "cpu",
+                "power",
+                "connectivity",
+                "trafficdrop",
+                "detection",
+                "external_connectors",
+                "external_connectors/details",
+                "edr",
+                "edr/details",
+                "network_brain/ping",
+            ]:
+                raise ValueError("Invalid check argument")
+            return self._request(method="get", url=f"{self.url}/health/{check}")
+
+    def get_user_roles(self):
+        return self._request(
+            method="get",
+            url=f"{self.url}/users/roles",
+        )
+
+    def create_user(self, **kwargs):
+        roles = self.get_user_roles()
+        standardized_names = [x["standardized_name"] for x in roles.json()]
+
+        if not (name := kwargs.get("name")):
+            raise ValueError(
+                "Must provide a name to create a user. The name field requires space separated first and last name."
+            )
+        if not (role := kwargs.get("role")) and role not in standardized_names:
+            raise ValueError("Must provide a valid role to create a user.")
+        if not (email := kwargs.get("email")):
+            raise ValueError("Must provide an email to create a user.")
+
+        payload = {
+            "name": name,
+            "role": role,
+            "email": email,
+        }
+
+        return self._request(method="post", url=f"{self.url}/users", json=payload)
+
+    def update_user(self, user_id=None, **kwargs):
+        roles = self.get_user_roles()
+        standardized_names = [x["standardized_name"] for x in roles.json()]
+        user = self.get_user_by_id(user_id=user_id).json()
+
+        if (
+            role := kwargs.get("role", user["role"])
+        ) and role not in standardized_names:
+            raise ValueError("Role is not valid.")
+
+        if (
+            not (name := kwargs.get("name", user["name"]))
+            and not isinstance(name, str)
+            and not len(name.split(" ")) == 2
+        ):
+            raise ValueError(
+                "Must provide a name to create a user. The name field requires space separated first and last name."
+            )
+
+        payload = {
+            "name": name,
+            "role": role,
+        }
+
+        return self._request(
+            method="patch", url=f"{self.url}/users/{user_id}", json=payload
+        )
+
+    def delete_user(self, user_id=None):
+        return self._request(method="delete", url=f"{self.url}/users/{user_id}")
+
+    def get_lockdown(self, **kwargs):
+        """ """
+        valid_keys = ["type"]
+        deprecated_keys = []
+
+        return self._request(
+            method="get",
+            url=f"{self.url}/lockdown",
+            params=_generate_params(kwargs, valid_keys, deprecated_keys),
+        )
 
 
-class ClientV3_latest(VectraPlatformClientV3_3):
+class ClientV3_latest(VectraPlatformClientV3_4):
     def __init__(
         self,
         user=None,

@@ -1,3 +1,4 @@
+import concurrent.futures
 import copy
 import html
 import ipaddress
@@ -5,6 +6,8 @@ import json
 import os
 import re
 import warnings
+from math import ceil
+from pathlib import Path
 
 import requests
 from urllib3 import disable_warnings, exceptions
@@ -28,7 +31,7 @@ class HTTPException(Exception):
             elif "tree_structure" in r:
                 detail = "\n".join(r["tree_structure"])
             elif "_meta" in r:
-                detail = r["_meta"]["message"]
+                detail = f'{r["_meta"]["message"]} - {r.content}'
             else:
                 detail = response.content
         except Exception:
@@ -38,6 +41,11 @@ class HTTPException(Exception):
 
 
 class HTTPUnauthorizedException(HTTPException):
+    def __init__(self, response):
+        super().__init__(response)
+
+
+class HTTPAlreadyExists(HTTPException):
     def __init__(self, response):
         super().__init__(response)
 
@@ -64,6 +72,8 @@ def request_error_handler(func):
             return response
         elif response.status_code == 401:
             raise HTTPUnauthorizedException(response)
+        elif response.status_code == 409:
+            raise HTTPAlreadyExists(response)
         elif response.status_code == 413:
             raise HTTPRequestEntityTooLarge(response)
         elif response.status_code == 422:
@@ -188,6 +198,7 @@ class VectraBaseClient(object):
         client_id=None,
         secret_key=None,
         verify=False,
+        threads=1,
     ):
         """
         Initialize Vectra client
@@ -202,6 +213,13 @@ class VectraBaseClient(object):
         """
         self.verify = verify
         self.timeout = 30
+        if threads <= 1:
+            self.threads = 1
+        elif threads >= 8:
+            self.threads = 8
+        else:
+            self.threads = threads
+
         url = _format_url(url)
         if client_id and secret_key and self.VERSION3 is not None:
             self.version = self.VERSION3
@@ -676,21 +694,56 @@ class VectraBaseClient(object):
             params=self._generate_host_params(kwargs),
         )
 
+    def get_threaded(self, url, count, **kwargs):
+        try:
+            page_size = kwargs["params"].pop("page_size")
+        except KeyError:
+            page_size = 5000
+        try:
+            kwargs["params"].pop("page")
+        except KeyError:
+            pass
+        pages = ceil(count / page_size)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.threads, thread_name_prefix="Get All Generator"
+        ) as executor:
+            try:
+                results = {
+                    executor.submit(
+                        self._request,
+                        method="get",
+                        url=url + f"?page={page}&page_size={page_size}",
+                        params=kwargs["params"],
+                    ): page
+                    for page in range(2, pages + 1)
+                }
+                for result in concurrent.futures.as_completed(results):
+                    yield result.result()
+            except KeyboardInterrupt:
+                executor.shutdown(wait=False, cancel_futures=True)
+
     @validate_gte_api_v3_3
     def get_all_hosts(self, **kwargs):
         """
         Generator to retrieve all hosts - all parameters are optional
         For available query params, see _generate_host_params
         """
+        url = f"{self.url}/hosts"
+        params = self._generate_host_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/hosts",
-            params=self._generate_host_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v3_3
     def get_host_by_id(self, host_id=None, **kwargs):
@@ -863,15 +916,21 @@ class VectraBaseClient(object):
         Generator to retrieve all detections - all parameters are optional
         For valid params, see _generate_detection_params
         """
+        url = f"{self.url}/detections"
+        params = self._generate_detection_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/detections",
+            url=url,
             params=self._generate_detection_params(kwargs),
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v2
     def get_detection_by_id(self, detection_id=None, **kwargs):
@@ -1172,15 +1231,21 @@ class VectraBaseClient(object):
         Generator to retrieve all rules page by page - all parameters are optional
         For valid query params, see _generate_rule_params
         """
+        url = f"{self.url}/rules"
+        params = self._generate_rule_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/rules",
-            params=self._generate_rule_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v2
     def create_rule(
@@ -1441,15 +1506,21 @@ class VectraBaseClient(object):
         Generator to retrieve all groups - all parameters are optional
         For valid params, see _generate_group_params
         """
+        url = f"{self.url}/groups"
+        params = self._generate_group_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/groups",
-            params=self._generate_group_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v3_2
     def get_group_by_id(self, group_id):
@@ -1517,7 +1588,7 @@ class VectraBaseClient(object):
 
     @validate_gte_api_v3_2
     def update_group(
-        self, group_id, name=None, description=None, members=[], append=False
+        self, group_id, name=None, description=None, members=[], append=False, **kwargs
     ):
         """
         Update group
@@ -1571,15 +1642,21 @@ class VectraBaseClient(object):
         Generator to query all users
         For valid params, see _generate_user_params
         """
+        url = f"{self.url}/users"
+        params = self._generate_user_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/users",
-            params=self._generate_user_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v3_3
     def get_user_by_name(self, username=None):
@@ -1594,7 +1671,7 @@ class VectraBaseClient(object):
 
         return self._request(method="get", url=f"{self.url}/users", params=params)
 
-    @validate_api_v2
+    @validate_gte_api_v3_3
     def get_user_by_id(self, user_id=None):
         """
         Get users by id
@@ -1830,11 +1907,16 @@ class VectraBaseClient(object):
         """
         Generator to get all traffic stats
         """
-        resp = self._request(method="get", url=f"{self.url}/traffic")
+        url = f"{self.url}/traffic"
+        resp = self._request(method="get", url=url)
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count)
 
     @validate_api_v2
     def get_all_sensor_traffic_stats(self, sensor_luid=None):
@@ -1842,14 +1924,19 @@ class VectraBaseClient(object):
         Generator to get all traffic stats from a sensor
         :param sensor_luid: LUID of the sensor for which to get the stats. Can be retrieved in the UI under Manage > Sensors
         """
+        url = f"{self.url}/traffic/{sensor_luid}"
         if not sensor_luid:
             raise ValueError("Sensor LUID required")
 
-        resp = self._request(method="get", url=f"{self.url}/traffic/{sensor_luid}")
+        resp = self._request(method="get", url=url)
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count)
 
     @validate_api_v2
     def get_all_subnets(self, **kwargs):
@@ -1859,15 +1946,21 @@ class VectraBaseClient(object):
             possible values are: subnet, hosts, firstSeen, lastSeen
         :param search: only return subnets containing the search string
         """
+        url = f"{self.url}/subnets"
+        params = self._generate_subnet_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/subnets",
-            params=self._generate_subnet_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_api_v2
     def get_all_sensor_subnets(self, sensor_luid=None, **kwargs):
@@ -1881,15 +1974,22 @@ class VectraBaseClient(object):
         if not sensor_luid:
             raise ValueError("Sensor LUID required")
 
+        url = f"{self.url}/subnets/{sensor_luid}"
+        params = self._generate_subnet_params(kwargs)
+
         resp = self._request(
             method="get",
-            url=f"{self.url}/subnets/{sensor_luid}",
-            params=self._generate_subnet_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_api_v2
     def get_ip_addresses(self, **kwargs):
@@ -2143,15 +2243,21 @@ class VectraClientV2_1(VectraBaseClient):
         :param threat: threat score (int)
         :param threat_gte: threat score greater than or equal to (int)
         """
+        url = f"{self.url}/accounts"
+        params = self._generate_account_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/accounts",
-            params=self._generate_account_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v2
     def get_account_by_id(self, account_id=None, **kwargs):
@@ -2325,15 +2431,21 @@ class VectraClientV2_1(VectraBaseClient):
         :param page: page number to return (int)
         :param page_size: number of object to return in response (int)
         """
+        url = f"{self.url}/rules"
+        params = self._generate_rule_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/rules",
-            params=self._generate_rule_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v2
     def create_rule(
@@ -2856,15 +2968,21 @@ class VectraClientV2_2(VectraClientV2_1):
         :param resolution: filter by resolution (int)
         :param resolved: filters by resolved status (bool)
         """
+        url = f"{self.url}/assignments"
+        params = self._generate_assignment_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/assignments",
-            params=self._generate_assignment_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v2
     def create_account_assignment(self, account_id=None, user_id=None):
@@ -2957,11 +3075,16 @@ class VectraClientV2_2(VectraClientV2_1):
         Get the outcome of a given assignment
         :param :
         """
-        resp = self._request(method="get", url=f"{self.url}/assignment_outcomes")
+        url = f"{self.url}/assignment_outcomes"
+        resp = self._request(method="get", url=url)
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count)
 
     @validate_gte_api_v2
     def get_assignment_outcome_by_id(self, assignment_outcome_id: int):
@@ -3305,15 +3428,21 @@ class VectraClientV2_4(VectraClientV2_2):
         :param page_size: number of object to return in response (int) TODO check
         :param type: type of group to search (domain/host/ip)
         """
+        url = f"{self.url}/groups"
+        params = self._generate_group_params(kwargs)
         resp = self._request(
             method="get",
-            url=f"{self.url}/groups",
-            params=self._generate_group_params(kwargs),
+            url=url,
+            params=params,
         )
         yield resp
-        while resp.json()["next"]:
-            resp = self._request(method="get", url=resp.json()["next"])
-            yield resp
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method="get", url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(url, count, params=params)
 
     @validate_gte_api_v3_2
     def create_group(self, name=None, description="", type=None, members=[], **kwargs):
@@ -3356,7 +3485,7 @@ class VectraClientV2_4(VectraClientV2_2):
 
     @validate_gte_api_v3_2
     def update_group(
-        self, group_id, name=None, description="", members=[], append=False
+        self, group_id, name=None, description="", members=[], append=False, **kwargs
     ):
         """
         Update group
@@ -3393,6 +3522,9 @@ class VectraClientV2_4(VectraClientV2_2):
         description = description if description else group["description"]
 
         payload = {"name": name, "description": description, "members": members}
+
+        for k, v in kwargs.items():
+            payload[k] = v
         return self._request(
             method="patch", url=f"{self.url}/groups/{id}", json=payload
         )
@@ -3744,6 +3876,30 @@ class VectraClientV2_5(VectraClientV2_4):
             json=payload,
             verify=self.verify,
         )
+
+    @request_error_handler
+    @validate_gte_api_v3_3
+    def download_vectra_ruleset(self, filename=None):
+        if filename is None:
+            filename = "curated.rules"
+        elif not isinstance(filename, str):
+            filename = "curated.rules"
+            raise TypeError(
+                "Filename must be of type str. File is being named 'curated.rules'."
+            )
+
+        p = Path(filename)
+        p.parent.mkdir(parents=True, exist_ok=True)
+
+        resp = self._request(
+            method="get", url=self.url + "/vectra-match/download-vectra-ruleset"
+        )
+
+        with open(str(filename), "wb") as file:
+            for chunk in resp.iter_content(chunk_size=8192):
+                if chunk:
+                    file.write(chunk)
+        return resp
 
 
 class ClientV2_latest(VectraClientV2_5):

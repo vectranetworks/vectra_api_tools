@@ -25,6 +25,17 @@ def test_get_assignments(vc):
     assert results.json()["count"] >= 1
 
 
+def test_assignments_threaded(vc, test_skip):
+    count = next(vc.get_all_assignments()).json()["count"]
+    vc.threads = 8
+    assignment_gen = []
+    for results in vc.get_all_assignments():
+        assignment_gen = assignment_gen + results.json()["results"]
+
+    assert count == len(assignment_gen)
+    vc.threads = 1
+
+
 def test_create_account_assignment(vc):
     account_id = next(vc.get_all_accounts()).json()["results"][0]["id"]
     users = []

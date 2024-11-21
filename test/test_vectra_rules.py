@@ -31,6 +31,17 @@ def test_get_rules(vc):
     assert resp.json()["count"] >= 1
 
 
+def test_rules_threaded(vc, test_skip):
+    count = next(vc.get_all_rules(page_size=1)).json()["count"]
+    vc.threads = 8
+    rule_gen = []
+    for results in vc.get_all_rules(page_size=50):
+        rule_gen = rule_gen + results.json()["results"]
+
+    assert count == len(rule_gen)
+    vc.threads = 1
+
+
 def test_create_rule_host(vc, test_skip, test_host):
     resp = vc.create_rule(
         detection_category="botnet activity",

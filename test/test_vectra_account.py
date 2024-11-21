@@ -12,6 +12,17 @@ def test_account_generator(vc):
     assert results.json()["count"] >= 1
 
 
+def test_accounts_threaded(vc):
+    count = next(vc.get_all_accounts(page_size=1)).json()["count"]
+    vc.threads = 8
+    account_gen = []
+    for results in vc.get_all_accounts(page_size=50):
+        account_gen = account_gen + results.json()["results"]
+
+    assert count == len(account_gen)
+    vc.threads = 1
+
+
 def test_get_accounts_id(vc):
     account_id = next(vc.get_all_accounts()).json()["results"][0]["id"]
     resp = vc.get_account_by_id(account_id=account_id)
