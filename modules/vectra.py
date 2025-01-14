@@ -209,6 +209,7 @@ class VectraBaseClient(object):
         :param user: Username to authenticate to Vectra brain when using API v1*
         :param password: Password when using username to authenticate using API v1*
         :param verify: Verify SSL (default: False) - optional
+        :param threads: Number of threads to use for paginated endpoints (default: 1) - optional
         *Either client_id, token, or user are required
         """
         self.verify = verify
@@ -696,11 +697,11 @@ class VectraBaseClient(object):
 
     def get_threaded(self, url, count, **kwargs):
         try:
-            page_size = kwargs["params"].pop("page_size")
+            page_size = int(kwargs.get("params", {}).pop("page_size", 5000))
         except KeyError:
             page_size = 5000
         try:
-            kwargs["params"].pop("page")
+            kwargs["params"].pop("page",None)
         except KeyError:
             pass
         pages = ceil(count / page_size)
@@ -722,6 +723,16 @@ class VectraBaseClient(object):
             except KeyboardInterrupt:
                 executor.shutdown(wait=False, cancel_futures=True)
 
+    def yield_results(self, resp, method, **kwargs):
+        params = kwargs.get("params", {})
+        if self.threads == 1:
+            while resp.json()["next"]:
+                resp = self._request(method=method, url=resp.json()["next"])
+                yield resp
+        else:
+            count = resp.json()["count"]
+            yield from self.get_threaded(resp.url.split("?")[0], count, params=params)
+
     @validate_gte_api_v3_3
     def get_all_hosts(self, **kwargs):
         """
@@ -730,20 +741,15 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/hosts"
         params = self._generate_host_params(kwargs)
+        method = "get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
 
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v3_3
     def get_host_by_id(self, host_id=None, **kwargs):
@@ -918,19 +924,15 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/detections"
         params = self._generate_detection_params(kwargs)
+        method = "get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=self._generate_detection_params(kwargs),
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v2
     def get_detection_by_id(self, detection_id=None, **kwargs):
@@ -1233,19 +1235,15 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/rules"
         params = self._generate_rule_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v2
     def create_rule(
@@ -1508,19 +1506,15 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/groups"
         params = self._generate_group_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v3_2
     def get_group_by_id(self, group_id):
@@ -1644,19 +1638,15 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/users"
         params = self._generate_user_params(kwargs)
+        method = "get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v3_3
     def get_user_by_name(self, username=None):
@@ -1908,15 +1898,11 @@ class VectraBaseClient(object):
         Generator to get all traffic stats
         """
         url = f"{self.url}/traffic"
-        resp = self._request(method="get", url=url)
+        method = "get"
+        resp = self._request(method=method, url=url)
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count)
+
+        yield from self.yield_results(resp, method)
 
     @validate_api_v2
     def get_all_sensor_traffic_stats(self, sensor_luid=None):
@@ -1927,16 +1913,12 @@ class VectraBaseClient(object):
         url = f"{self.url}/traffic/{sensor_luid}"
         if not sensor_luid:
             raise ValueError("Sensor LUID required")
+        method="get"
 
-        resp = self._request(method="get", url=url)
+        resp = self._request(method=method, url=url)
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count)
+
+        yield from self.yield_results(resp, method)
 
     @validate_api_v2
     def get_all_subnets(self, **kwargs):
@@ -1948,19 +1930,15 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/subnets"
         params = self._generate_subnet_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_api_v2
     def get_all_sensor_subnets(self, sensor_luid=None, **kwargs):
@@ -1976,20 +1954,15 @@ class VectraBaseClient(object):
 
         url = f"{self.url}/subnets/{sensor_luid}"
         params = self._generate_subnet_params(kwargs)
-
+        method = "get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_api_v2
     def get_ip_addresses(self, **kwargs):
@@ -2245,19 +2218,15 @@ class VectraClientV2_1(VectraBaseClient):
         """
         url = f"{self.url}/accounts"
         params = self._generate_account_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v2
     def get_account_by_id(self, account_id=None, **kwargs):
@@ -2433,19 +2402,15 @@ class VectraClientV2_1(VectraBaseClient):
         """
         url = f"{self.url}/rules"
         params = self._generate_rule_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v2
     def create_rule(
@@ -2970,19 +2935,15 @@ class VectraClientV2_2(VectraClientV2_1):
         """
         url = f"{self.url}/assignments"
         params = self._generate_assignment_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v2
     def create_account_assignment(self, account_id=None, user_id=None):
@@ -3076,15 +3037,11 @@ class VectraClientV2_2(VectraClientV2_1):
         :param :
         """
         url = f"{self.url}/assignment_outcomes"
-        resp = self._request(method="get", url=url)
+        method="get"
+        resp = self._request(method=method, url=url)
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count)
+
+        yield from self.yield_results(resp, method)
 
     @validate_gte_api_v2
     def get_assignment_outcome_by_id(self, assignment_outcome_id: int):
@@ -3430,19 +3387,15 @@ class VectraClientV2_4(VectraClientV2_2):
         """
         url = f"{self.url}/groups"
         params = self._generate_group_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+
+        yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v3_2
     def create_group(self, name=None, description="", type=None, members=[], **kwargs):

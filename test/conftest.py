@@ -1,8 +1,9 @@
 import pytest
-
+import urllib3
 import vat.platform as platform
 import vat.vectra as vectra
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 def pytest_addoption(parser):
     parser.addoption("--url", action="store", help="url or ip of vectra brain")
@@ -11,7 +12,7 @@ def pytest_addoption(parser):
     parser.addoption("--user", help="username")
     parser.addoption("--password", help="password")
     parser.addoption("--token", help="token")
-    parser.addoption("--client_ver", help="1, 2.1, 2.2, 2.4, 2.5, 3, 3.1, 3.2, 3.3")
+    parser.addoption("--client_ver", help="1, 2.1, 2.2, 2.4, 2.5, 3, 3.1, 3.2, 3.3, 3.4")
 
 
 VectraClient = {
@@ -26,6 +27,7 @@ VectraClient = {
     "3.1": platform.VectraPlatformClientV3_1,
     "3.2": platform.VectraPlatformClientV3_2,
     "3.3": platform.VectraPlatformClientV3_3,
+    "3.4": platform.VectraPlatformClientV3_4,
 }
 
 

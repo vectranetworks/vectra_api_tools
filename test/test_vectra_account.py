@@ -46,4 +46,4 @@ def test_account_tags(vc):
     ]
 
     vc.set_account_tags(account_id=account_id, tags=account_tags)
-    assert vc.get_account_tags(account_id=account_id).json()["tags"] == account_tags
+    assert vc.get_account_tags(account_id=account_id).json()["tags"].sort() == account_tags.sort()

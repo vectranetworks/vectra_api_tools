@@ -6,7 +6,7 @@ requests.packages.urllib3.disable_warnings()
 
 @pytest.fixture()
 def test_skip(vc):
-    if vc.version not in [3.1, 3.2, 3.3]:
+    if vc.version not in [3.1, 3.2, 3.3, 3.4]:
         pytest.skip(
             allow_module_level=True,
             reason="Method is accessible via v3+ of API",
@@ -14,7 +14,7 @@ def test_skip(vc):
 
 
 def test_get_entity_note_modified(vc, test_skip):
-    resp = vc.get_all_entities(note_modified_timestamp_gte=100)
+    resp = vc.get_all_entities(note_modified_timestamp_gte="2019-08-27T20:55:29Z")
 
     assert next(resp).status_code == 200
 

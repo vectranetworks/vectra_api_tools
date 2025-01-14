@@ -20,13 +20,14 @@ def test_detection_id(vc):
 
 
 def test_detection_threaded(vc):
-    count = next(vc.get_all_detections(page_size=1, is_triaged=False)).json()["count"]
+    count = next(vc.get_all_detections(page_size=1)).json()["count"]
     vc.threads = 8
     detection_gen = []
-    for results in vc.get_all_detections(page_size=50, is_triaged=False):
+    for results in vc.get_all_detections(page_size=50):
         detection_gen = detection_gen + results.json()["results"]
+    
 
-    assert count == len(set(detection_gen))
+    assert count == len(detection_gen)
     vc.threads = 1
 
 

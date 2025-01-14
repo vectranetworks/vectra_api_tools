@@ -93,9 +93,9 @@ class VectraPlatformClientV3(VectraClientV2_5):
             requests.exceptions.HTTPError,
             CustomException,
         ),
-        max_tries=3,
+        max_tries=5,
         on_giveup=kill_process_and_exit,
-        max_time=30,
+        max_time=60,
     )
     def _refresh_token(self):
         """Generate access token for API authentication.
@@ -150,9 +150,9 @@ class VectraPlatformClientV3(VectraClientV2_5):
             requests.exceptions.HTTPError,
             CustomException,
         ),
-        max_tries=3,
+        max_tries=5,
         on_giveup=kill_process_and_exit,
-        max_time=30,
+        max_time=60,
     )
     def _get_token(self):
         """Generate access token for API authentication.
@@ -218,6 +218,25 @@ class VectraPlatformClientV3(VectraClientV2_5):
         elif self._accessTime < int(time.time()):
             self._refresh_token()
 
+    def yield_event_results(self, resp, method, **kwargs):
+        params = kwargs.get("params", {})
+        if self.threads == 1:
+            while resp.json()["remaining_count"] > 0:
+                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+                resp = self._request(
+                    method=method,
+                    url=resp.url.split("?")[0],
+                    params=params,
+                )
+                yield resp
+        else:
+            count = resp.json()["remaining_count"]
+            if count > 0:
+                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
+                yield from self.get_threaded_events(
+                    resp.url.split("?")[0], count, **kwargs
+                )
+
     @staticmethod
     def _generate_detection_params(args):
         """
@@ -246,6 +265,8 @@ class VectraPlatformClientV3(VectraClientV2_5):
             "certainty",
             "certainty_gte",
             "last_timestamp",
+            "last_timestamp_gte",
+            "last_timestamp_lte",
             "host_id",
             "tags",
             "destination",
@@ -372,10 +393,17 @@ class VectraPlatformClientV3(VectraClientV2_5):
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
-    def get_threaded_events(self, url, count, **kwargs):
-
-        limit = kwargs.pop("limit")
-        checkpoint = kwargs.pop("checkpoint")
+    def get_threaded_events(self, resp, count, **kwargs):
+        """
+        Threaded generator to retrieve all events
+        :param url: Brain URL
+        :param checkpoint: Event ID from which to start the query
+        :param count: Total number of events to retrieve
+        :param limit: Number of events to retrieve per request
+        :rtype: json object
+        """
+        limit = int(kwargs.pop("limit", 500))
+        checkpoint = int(kwargs.pop("checkpoint",0))
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.threads, thread_name_prefix="Get All Generator"
         ) as executor:
@@ -384,7 +412,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
                     executor.submit(
                         self._request,
                         method="get",
-                        url=url + f"?from={next_checkpoint}&limit={limit}",
+                        url=resp.url.split("?")[0] + f"?from={next_checkpoint}&limit={limit}",
                         params=kwargs,
                     ): next_checkpoint
                     for next_checkpoint in range(checkpoint, count + limit, limit)
@@ -466,7 +494,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :param ordering:
         """
         try:
-            limit = kwargs.pop("limit")
+            limit = int(kwargs.pop("limit", 500))
         except KeyError:
             limit = 500
 
@@ -476,21 +504,15 @@ class VectraPlatformClientV3(VectraClientV2_5):
             limit = 1
 
         kwargs["limit"] = limit
-        resp = self.get_audits(**kwargs)
+        method="get"
+        resp = self._request(
+            method=method,
+            url=f"{self.url}/events/audits",
+            params=self._generate_audit_params(kwargs),
+        )
         yield resp
-
-        if self.threads == 1:
-            while resp.json()["remaining_count"] > 0:
-                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-                resp = self.get_audits(**kwargs)
-                yield resp
-        else:
-            count = resp.json()["remaining_count"]
-            if count > 0:
-                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-                yield from self.get_threaded_events(
-                    f"{self.url}/events/audits", count, **kwargs
-                )
+        
+        yield from self.yield_event_results(resp, method, **kwargs)
 
     def get_audits(self, **kwargs):
         """
@@ -602,19 +624,15 @@ class VectraPlatformClientV3_1(VectraPlatformClientV3):
         """
         url = f"{self.url}/entities"
         params = self._generate_entity_params(kwargs)
+        method="get"
         resp = self._request(
-            method="get",
+            method=method,
             url=url,
             params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["next"]:
-                resp = self._request(method="get", url=resp.json()["next"])
-                yield resp
-        else:
-            count = resp.json()["count"]
-            yield from self.get_threaded(url, count, params=params)
+ 
+        yield from self.yield_results(resp, method, **kwargs)
 
     def get_entity_by_id(self, entity_id=None, **kwargs):
         """
@@ -1110,7 +1128,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param detection_id
         """
         try:
-            limit = kwargs.pop("limit")
+            limit = int(kwargs.pop("limit", 500))
         except KeyError:
             limit = 500
 
@@ -1119,29 +1137,17 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         elif limit <= 0:
             limit = 1
 
+        params = params=self._generate_detection_events_params(kwargs)
         kwargs["limit"] = limit
+        method = "get"
         resp = self._request(
-            method="get",
+            method=method,
             url=f"{self.url}/events/detections",
-            params=self._generate_detection_events_params(kwargs),
+            params=params,
         )
         yield resp
-        if self.threads == 1:
-            while resp.json()["remaining_count"] > 0:
-                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-                resp = self._request(
-                    method="get",
-                    url=f"{self.url}/events/detections",
-                    params=self._generate_detection_events_params(kwargs),
-                )
-                yield resp
-        else:
-            count = resp.json()["remaining_count"]
-            if count > 0:
-                kwargs["checkpoint"] = resp.json()["next_checkpoint"]
-                yield from self.get_threaded_events(
-                    f"{self.url}/events/detections", count, **kwargs
-                )
+
+        yield from self.yield_event_results(resp,method,params=params)
 
     def get_detection_events(self, **kwargs):
         """
@@ -1370,6 +1376,8 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             "certainty",
             "certainty_gte",
             "last_timestamp",
+            "last_timestamp_gte",
+            "last_timestamp_lte",
             "host_id",
             "tags",
             "destination",
@@ -1419,25 +1427,27 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
 
         params = _generate_params(args, valid_keys, deprecated_keys)
         return params
+    
 
     def create_group(self, **kwargs):
         if not (name := kwargs.get("name")):
             raise ValueError("Missing required parameter: name")
+        
+        members = kwargs.get("members", [])
+        regex = kwargs.get("regex", None)
+        type = kwargs.get("type", "")
 
-        if "members" in kwargs and "regex" in kwargs:
+        if members != [] and regex is not None:
             raise ValueError("Members cannot be specified when creating a regex group.")
-        elif members := kwargs.get("members"):
+        elif members != []:
             regex = None
-        elif regex := kwargs.get("regex"):
+        elif regex is not None:
             members = []
-        else:
-            members = []
-            regex = None
 
         importance = kwargs.get("importance", "medium")
         description = kwargs.get("description", "")
 
-        if regex is None and (type := kwargs.get("type", "")) not in [
+        if regex is None and type not in [
             "host",
             "domain",
             "ip",
@@ -1446,7 +1456,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             raise ValueError(
                 'parameter type must have value "account", "domain", "ip" or "host"'
             )
-        elif (type := kwargs.get("type", "")) not in ["host", "account"]:
+        elif regex is not None and type not in ["host", "account"]:
             raise ValueError('parameter type must have value "account" or "host"')
         rules = kwargs.get("rules", [])
         if not isinstance(members, list):
@@ -1566,6 +1576,36 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             method="get",
             url=f"{self.url}/users/roles",
         )
+        
+    def get_user_by_name(self, username=None, **kwargs):
+        """
+        :param username: Value contained in the name field. 
+        :rtype: list
+        """
+        if username is None:
+            raise ValueError(
+                "Must provide a name."
+            )
+        users_list = []
+        for users in self.get_all_users():
+            for user in users.json()["results"]:
+                if username in user["name"]:
+                    users_list.append(user)
+        return users_list
+        
+    def get_user_by_email(self, email=None, **kwargs):
+        """
+        :param email: The email to be queried
+        :rtype: dict
+        """
+        if email is None:
+            raise ValueError(
+                "Must provide an email."
+            )
+        for users in self.get_all_users(email=email):
+            for user in users.json()["results"]:
+                return user
+        
 
     def create_user(self, **kwargs):
         roles = self.get_user_roles()
