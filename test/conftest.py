@@ -1,11 +1,15 @@
+"""
+Setup testing environment
+"""
 import pytest
-import urllib3
-import vat.platform as platform
-import vat.vectra as vectra
 
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from ..modules import platform
+from ..modules import vectra
 
 def pytest_addoption(parser):
+    """
+    Add Parameters
+    """
     parser.addoption("--url", action="store", help="url or ip of vectra brain")
     parser.addoption("--client_id", help="client_id")
     parser.addoption("--secret_key", help="secret_key")
@@ -33,6 +37,9 @@ VectraClient = {
 
 @pytest.fixture(scope="module")
 def vc(request):
+    """
+    Create Vectra Client object
+    """
     if float(request.config.getoption("--client_ver")) < 2:
         brain = request.config.getoption("--url")
         username = request.config.getoption("--user")
@@ -40,14 +47,14 @@ def vc(request):
 
         return vectra.VectraBaseClient(url=brain, user=username, password=passwd)
 
-    elif 2 < float(request.config.getoption("--client_ver")) < 3:
+    if 2 < float(request.config.getoption("--client_ver")) < 3:
         version = request.config.getoption("--client_ver")
         brain = request.config.getoption("--url")
         token = request.config.getoption("--token")
 
         return VectraClient[version](url=brain, token=token)
 
-    elif float(request.config.getoption("--client_ver")) >= 3:
+    if float(request.config.getoption("--client_ver")) >= 3:
         version = request.config.getoption("--client_ver")
         brain = request.config.getoption("--url")
         client_id = request.config.getoption("--client_id")
@@ -57,5 +64,4 @@ def vc(request):
             url=brain, client_id=client_id, secret_key=secret_key
         )
 
-    else:
-        return False
+    return False

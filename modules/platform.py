@@ -5,16 +5,20 @@ import logging
 import sys
 import time
 import warnings
+from os import environ
 from pathlib import Path
 
 import backoff
 import requests
 
-from vat.vectra import (
-    HTTPException,
-    VectraClientV2_5,
-    _generate_params,
-)
+if environ.get("PYTEST_VERSION") is not None:
+    from .vectra import HTTPException, VectraClientV2_5, _generate_params
+else:
+    from vat.vectra import (
+        HTTPException,
+        VectraClientV2_5,
+        _generate_params,
+    )
 
 warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
@@ -918,7 +922,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             method="get", url=f"{self.url}/tagging/entity/{entity_id}", params=params
         )
 
-    def set_entity_tags(self, entity_id=None, tags=[], append=False, **kwargs):
+    def set_entity_tags(self, entity_id=None, tags=None, append=False, **kwargs):
         """
         Set  entity tags
         :param entity_id: - required
@@ -927,6 +931,8 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param append: overwrites existing list if set to False, appends to existing tags if set to True
         Set to empty list to clear all tags (default: False)
         """
+        if tags is None:
+            tags = []
         params = self._generate_entity_params(kwargs)
         if not entity_id:
             raise ValueError("Must provide entity_id.")
