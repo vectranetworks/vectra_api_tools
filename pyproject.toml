@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vectra-api-tools"
-version = "3.3.1"
+version = "3.4.0"
 authors = [
   { name="Brandon Wyatt", email="bwyatt@vectra.ai" },
   { name="Vectra", email="tme@vectra.ai" },
@@ -17,13 +17,10 @@ classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent", 
 ]
-dependencies = ["requests", "pytz", "cabby", "stix", "backoff"]
+dependencies = ["requests", "pytz", "cabby", "stix", "backoff", "pytest-dependency"]
 
 [project.urls]
 Homepage = "https://github.com/vectranetworks/vectra_api_tools"
-
-#[tool.hatch.build.targets.wheel]
-#packages = ["vat/platform.py", "vat/vectra.py"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "./modules" = "vat"

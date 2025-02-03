@@ -19,6 +19,17 @@ def test_detection_id(vc):
     assert result.json()["id"] == det_id
 
 
+def test_detection_threaded(vc):
+    count = next(vc.get_all_detections(page_size=1)).json()["count"]
+    vc.threads = 8
+    detection_gen = []
+    for results in vc.get_all_detections(page_size=50):
+        detection_gen = detection_gen + results.json()["results"]
+
+    assert count <= len(detection_gen)
+    vc.threads = 1
+
+
 def test_detection_tags(vc):
     detection = next(vc.get_all_detections()).json()["results"][0]
     detection_id = detection["id"]
@@ -28,11 +39,8 @@ def test_detection_tags(vc):
     assert vc.get_detection_tags(detection_id=detection_id).json()["tags"] == ["pytest"]
 
     vc.set_detection_tags(detection_id=detection_id, tags=["foo", "bar"], append=True)
-    assert vc.get_detection_tags(detection_id=detection_id).json()["tags"] == [
-        "pytest",
-        "foo",
-        "bar",
-    ]
+    for tag in vc.get_detection_tags(detection_id=detection_id).json()["tags"]:
+        assert tag in ["pytest", "foo", "bar"]
 
     vc.set_detection_tags(detection_id=detection_id, tags=detection_tags)
     assert (

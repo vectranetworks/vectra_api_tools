@@ -8,7 +8,7 @@ test_vars = {}
 
 @pytest.fixture()
 def test_skip(vc):
-    if vc.version not in [2.1, 2.2, 2.4, 2.5, 3.3]:
+    if vc.version not in [2.1, 2.2, 2.4, 2.5, 3.3, 3.4]:
         pytest.skip(
             allow_module_level=True,
             reason="Method is accessible via v2 and v3.3+ of API",
@@ -31,7 +31,19 @@ def test_get_rules(vc):
     assert resp.json()["count"] >= 1
 
 
-def test_create_rule_host(vc, test_skip, test_host):
+def test_rules_threaded(vc, test_skip):
+    count = next(vc.get_all_rules(page_size=1)).json()["count"]
+    vc.threads = 8
+    rule_gen = []
+    for results in vc.get_all_rules(page_size=50):
+        rule_gen = rule_gen + results.json()["results"]
+
+    assert count <= len(rule_gen)
+    vc.threads = 1
+
+
+@pytest.mark.dependency()
+def test_create_host_rule(vc, test_skip, test_host):
     resp = vc.create_rule(
         detection_category="botnet activity",
         detection_type="cryptocurrency mining",
@@ -75,7 +87,8 @@ def test_create_rule_host(vc, test_skip, test_host):
     assert resp.status_code == 201
 
 
-def test_create_rule_ip(vc):
+@pytest.mark.dependency()
+def test_create_ip_rule(vc):
     resp = vc.create_rule(
         detection_category="botnet activity",
         detection_type="outbound dos",
@@ -117,13 +130,14 @@ def test_create_rule_ip(vc):
         },
     )
 
-    test_vars["host_rule_ip"] = resp.json().get("id", None)
+    test_vars["ip_rule_id"] = resp.json().get("id", None)
     assert resp.status_code == 201
 
 
+@pytest.mark.dependency(depends=["test_create_ip_rule"])
 def test_update_rule_replace(vc):
     resp = vc.update_rule(
-        rule_id=test_vars["host_rule_ip"],
+        rule_id=test_vars["ip_rule_id"],
         triage_category="Pytest Replace",
         description="pytest_ip_rule_replace",
         additional_conditions={
@@ -172,9 +186,10 @@ def test_update_rule_replace(vc):
     )
 
 
+@pytest.mark.dependency(depends=["test_create_host_rule", "test_create_ip_rule"])
 def test_delete_rule(vc):
-    if vc.version in [2.1, 2.2, 2.4, 2.5, 3.3]:
+    if vc.version in [2.1, 2.2, 2.4, 2.5, 3.3, 3.4]:
         resp1 = vc.delete_rule(rule_id=test_vars["host_rule_id"])
         assert resp1.status_code == 204
-    resp2 = vc.delete_rule(rule_id=test_vars["host_rule_ip"])
+    resp2 = vc.delete_rule(rule_id=test_vars["ip_rule_id"])
     assert resp2.status_code == 204
