@@ -11,7 +11,7 @@ https://github.com/vectranetworks/vectra_api_tools/wiki
 
 **Current versions**  
 2.5
-3.3
+3.4
 
 **License**  
 Apache 2

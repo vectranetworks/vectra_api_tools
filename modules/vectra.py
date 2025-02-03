@@ -696,15 +696,13 @@ class VectraBaseClient(object):
         )
 
     def get_threaded(self, url, count, **kwargs):
+        page_size = kwargs.get("params", {}).get("page_size", 5000)
         try:
-            page_size = int(kwargs.get("params", {}).pop("page_size", 5000))
-        except KeyError:
-            page_size = 5000
-        try:
-            kwargs["params"].pop("page",None)
+            kwargs["params"].pop("page", None)
         except KeyError:
             pass
         pages = ceil(count / page_size)
+
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.threads, thread_name_prefix="Get All Generator"
         ) as executor:
@@ -714,7 +712,7 @@ class VectraBaseClient(object):
                         self._request,
                         method="get",
                         url=url + f"?page={page}&page_size={page_size}",
-                        params=kwargs["params"],
+                        params=kwargs.get("params", {}),
                     ): page
                     for page in range(2, pages + 1)
                 }
@@ -724,14 +722,13 @@ class VectraBaseClient(object):
                 executor.shutdown(wait=False, cancel_futures=True)
 
     def yield_results(self, resp, method, **kwargs):
-        params = kwargs.get("params", {})
         if self.threads == 1:
             while resp.json()["next"]:
                 resp = self._request(method=method, url=resp.json()["next"])
                 yield resp
         else:
             count = resp.json()["count"]
-            yield from self.get_threaded(resp.url.split("?")[0], count, params=params)
+            yield from self.get_threaded(resp.url.split("?")[0], count, **kwargs)
 
     @validate_gte_api_v3_3
     def get_all_hosts(self, **kwargs):
@@ -1235,7 +1232,7 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/rules"
         params = self._generate_rule_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
@@ -1506,7 +1503,7 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/groups"
         params = self._generate_group_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
@@ -1646,13 +1643,16 @@ class VectraBaseClient(object):
         )
         yield resp
 
+        # page_size only used to identify number of pages. Not a valid param.
+        params["page_size"] = len(resp.json()["results"])
+
         yield from self.yield_results(resp, method, params=params)
 
     @validate_gte_api_v3_3
     def get_user_by_name(self, username=None):
         """
         Get users by name
-        :param user: id of user to retrieve
+        :param user: name of user to retrieve
         """
         if not username:
             raise ValueError("Username required")
@@ -1668,7 +1668,7 @@ class VectraBaseClient(object):
         :param user: id of user to retrieve
         """
         if not user_id:
-            raise ValueError("Username required")
+            raise ValueError("User ID required")
 
         # params = {"username": username}
 
@@ -1823,14 +1823,14 @@ class VectraBaseClient(object):
         """
         return self._request(method="delete", url=f"{self.url}/threatFeeds/{feed_id}")
 
-    @validate_gte_api_v3_3
+    @validate_gte_api_v2
     def get_feeds(self):
         """
         Gets list of currently configured threat feeds
         """
         return self._request(method="get", url=f"{self.url}/threatFeeds")
 
-    @validate_gte_api_v3_3
+    @validate_gte_api_v2
     def get_feed_by_name(self, name=None):
         """
         Gets configured threat feed by name
@@ -1913,7 +1913,7 @@ class VectraBaseClient(object):
         url = f"{self.url}/traffic/{sensor_luid}"
         if not sensor_luid:
             raise ValueError("Sensor LUID required")
-        method="get"
+        method = "get"
 
         resp = self._request(method=method, url=url)
         yield resp
@@ -1930,7 +1930,7 @@ class VectraBaseClient(object):
         """
         url = f"{self.url}/subnets"
         params = self._generate_subnet_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
@@ -2218,7 +2218,7 @@ class VectraClientV2_1(VectraBaseClient):
         """
         url = f"{self.url}/accounts"
         params = self._generate_account_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
@@ -2402,7 +2402,7 @@ class VectraClientV2_1(VectraBaseClient):
         """
         url = f"{self.url}/rules"
         params = self._generate_rule_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
@@ -2935,13 +2935,16 @@ class VectraClientV2_2(VectraClientV2_1):
         """
         url = f"{self.url}/assignments"
         params = self._generate_assignment_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
             params=params,
         )
         yield resp
+
+        # page_size only used to identify number of pages. Not a valid param.
+        params["page_size"] = len(resp.json()["results"])
 
         yield from self.yield_results(resp, method, params=params)
 
@@ -3037,7 +3040,7 @@ class VectraClientV2_2(VectraClientV2_1):
         :param :
         """
         url = f"{self.url}/assignment_outcomes"
-        method="get"
+        method = "get"
         resp = self._request(method=method, url=url)
         yield resp
 
@@ -3387,7 +3390,7 @@ class VectraClientV2_4(VectraClientV2_2):
         """
         url = f"{self.url}/groups"
         params = self._generate_group_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,

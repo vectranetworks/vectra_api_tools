@@ -1,4 +1,5 @@
 import concurrent.futures
+import copy
 import json
 import logging
 import sys
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import backoff
 import requests
+
 from vat.vectra import (
     HTTPException,
     VectraClientV2_5,
@@ -403,7 +405,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :rtype: json object
         """
         limit = int(kwargs.pop("limit", 500))
-        checkpoint = int(kwargs.pop("checkpoint",0))
+        checkpoint = int(kwargs.pop("checkpoint", 0))
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.threads, thread_name_prefix="Get All Generator"
         ) as executor:
@@ -412,7 +414,8 @@ class VectraPlatformClientV3(VectraClientV2_5):
                     executor.submit(
                         self._request,
                         method="get",
-                        url=resp.url.split("?")[0] + f"?from={next_checkpoint}&limit={limit}",
+                        url=resp.url.split("?")[0]
+                        + f"?from={next_checkpoint}&limit={limit}",
                         params=kwargs,
                     ): next_checkpoint
                     for next_checkpoint in range(checkpoint, count + limit, limit)
@@ -504,14 +507,14 @@ class VectraPlatformClientV3(VectraClientV2_5):
             limit = 1
 
         kwargs["limit"] = limit
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=f"{self.url}/events/audits",
             params=self._generate_audit_params(kwargs),
         )
         yield resp
-        
+
         yield from self.yield_event_results(resp, method, **kwargs)
 
     def get_audits(self, **kwargs):
@@ -624,15 +627,15 @@ class VectraPlatformClientV3_1(VectraPlatformClientV3):
         """
         url = f"{self.url}/entities"
         params = self._generate_entity_params(kwargs)
-        method="get"
+        method = "get"
         resp = self._request(
             method=method,
             url=url,
             params=params,
         )
         yield resp
- 
-        yield from self.yield_results(resp, method, **kwargs)
+
+        yield from self.yield_results(resp, method, params=params)
 
     def get_entity_by_id(self, entity_id=None, **kwargs):
         """
@@ -875,6 +878,25 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         deprecated_keys = []
 
         return _generate_params(args, valid_keys, deprecated_keys)
+
+    @staticmethod
+    def _generate_feed_params(args):
+        """
+        valid_keys = [
+            "category",
+            "certainty",
+            "expiration",
+            "lastUpdated",
+            "lastUpdatedBy",
+            "name",
+            "ordering",
+            "page",
+            "page_size",
+        ]
+
+        Args:
+            args (_type_): _description_
+        """
 
     def get_entity_tags(self, entity_id=None, **kwargs):
         """
@@ -1137,7 +1159,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         elif limit <= 0:
             limit = 1
 
-        params = params=self._generate_detection_events_params(kwargs)
+        params = params = self._generate_detection_events_params(kwargs)
         kwargs["limit"] = limit
         method = "get"
         resp = self._request(
@@ -1147,7 +1169,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         )
         yield resp
 
-        yield from self.yield_event_results(resp,method,params=params)
+        yield from self.yield_event_results(resp, method, params=params)
 
     def get_detection_events(self, **kwargs):
         """
@@ -1209,10 +1231,10 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param file: name of ruleset desired to be uploaded (required)
         :param notes: notes about the uploaded file (optional)
         """
-        params = self._generate_vectramatch_params(kwargs)
-        if not params.get("file_path"):
+        file_path = kwargs.get("file_path", False)
+        if not file_path:
             raise ValueError("A ruleset filename is required.")
-        params["notes"] = params.get("notes", "")
+        notes = kwargs.get("notes", "")
         headers = {"Authorization": self.headers["Authorization"]}
 
         # Get the upload url
@@ -1220,14 +1242,14 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             method="post",
             url=f"{self.url}/vectra-match/rules/upload/",
             headers=headers,
-            json={"file_name": params["file"], "notes": params["notes"]},
+            json={"file_name": file_path, "notes": notes},
         )
 
         upload_url = resp.json()["urls"][0]
         upload_id = resp.json()["id"]
 
         # Upload the file to the provided url
-        payload = open(f"{params['file']}", "rb")
+        payload = open(f"{file_path}", "rb")
         resp = requests.put(upload_url, data=payload)
 
         if resp.status_code == 200:
@@ -1249,6 +1271,114 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
                 time.sleep(5)
 
         return resp
+
+    def get_feeds(self, **kwargs):
+        """
+        Gets list of currently configured threat feeds
+        :param category: category that detection will register. supported values are lateral, exfil, and cnc
+        :param certainty: certainty applied to detection. Supported values are Low, Medium, High
+        :param expiration: Date feed expires ISO8601
+        :param lastUpdated: Date feed last updated ISO8601
+        :param lastUpdatedBy: By whom feed was last updated
+        :param name: name of threat feed
+        :param ordering: field to use to order response
+        :param page: Which page to return in multipage requests
+        :param page_size: How many items to return to page
+        """
+
+        params = self._generate_feed_params(kwargs)
+        return self._request(method="get", url=f"{self.url}/threatFeeds", params=params)
+
+    def get_feed_by_name(self, name=None):
+        """
+        Gets configured threat feed by name
+        :param name: name of threat feed
+        """
+        return self.get_feeds(name=name)
+
+    def update_feed(self, name, **kwargs):
+        """
+        Update threat feed
+        ***Values for category, type, and certainty are case sensitive***
+        ***STIX files must already be uploaded***
+        :param feed_id: id of the feed to update
+        :param name: name of threat feed
+        :param category: category that detection will register. supported values are lateral, exfil, and cnc
+        :param certainty: certainty applied to detection. Supported values are Low, Medium, High
+        :param itype: indicator type - supported values are Anonymize, Exfiltration, Malware Artifacts, and Watchlist
+        :param duration: days that the threat feed will be applied
+        :param replace_filename: Name of uploaded STIX file to update on Threat feed
+        :param filename: Name of STIX file to be replaced on Threat feed
+        :returns: request object
+        """
+        feed_to_update = self.get_feed_by_name(name=name)
+
+        feed_id = feed_to_update["id"]
+
+        category = kwargs.get("category", feed_to_update["category"])
+        certainty = kwargs.get("certainty", feed_to_update["certainty"])
+        itype = kwargs.get("itype", feed_to_update["itype"])
+        duration = kwargs.get("duration", feed_to_update["duration"])
+        replace_filename = kwargs.get("replace_filename", None)
+        filename = kwargs.get("filename", None)
+
+        if replace_filename is None or filename is None:
+            raise ValueError(
+                "Must provide 'replace_filename' and 'filename' to update threat feed"
+            )
+
+        if category not in ["lateral", "exfil", "cnc"]:
+            raise ValueError(f"Invalid category provided: {category}")
+
+        if certainty not in ["Low", "Medium", "High"]:
+            raise ValueError(f"Invalid certainty provided: {str(certainty)}")
+
+        if itype not in [
+            "Anonymize",
+            "Exfiltration",
+            "Malware Artifacts",
+            "Watchlist",
+            "C2",
+        ]:
+            raise ValueError(f"Invalid itype provided: {str(itype)}")
+
+        if not isinstance(duration, int):
+            raise ValueError(
+                "Invalid duration provided, duration must be an integer value"
+            )
+
+        payload = {
+            "threatFeed": {
+                "name": name,
+                "defaults": {
+                    "category": category,
+                    "certainty": certainty,
+                    "indicatorType": itype,
+                    "duration": duration,
+                },
+                "upload": {"replace_filename": replace_filename, "filename": filename},
+            }
+        }
+
+        return self._request(
+            method="post", url=f"{self.url}/threatFeeds/{feed_id}", json=payload
+        )
+
+    def post_stix_file(self, feed_id=None, stix_file=None):
+        """
+        Uploads STIX file to new threat feed or overwrites STIX file in existing threat feed
+        :param feed_id: id of threat feed
+        :param stix_file: stix filename
+        """
+        headers = copy.deepcopy(self.headers)
+        headers.pop("Content-Type", None)
+        headers.update({"User-agent": "Mozilla/5.0"})
+        return self._request(
+            method="post",
+            url=f"{self.url}/threatFeeds/{feed_id}",
+            headers=headers,
+            files={"file": open(stix_file, "rb")},
+        )
 
 
 class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
@@ -1427,12 +1557,11 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
 
         params = _generate_params(args, valid_keys, deprecated_keys)
         return params
-    
 
     def create_group(self, **kwargs):
         if not (name := kwargs.get("name")):
             raise ValueError("Missing required parameter: name")
-        
+
         members = kwargs.get("members", [])
         regex = kwargs.get("regex", None)
         type = kwargs.get("type", "")
@@ -1493,22 +1622,33 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
     def update_group(self, group_id=None, **kwargs):
         group = self.get_group_by_id(group_id=group_id).json()
 
-        if members := kwargs.get("members"):
+        if members := kwargs.get("members", []):
             if kwargs.get("regex"):
                 raise ValueError(
-                    "Members cannot be specified when creating a regex group."
+                    "Members cannot be specified when updating a regex group."
                 )
             else:
                 regex = None
         elif regex := kwargs.get("regex"):
             pass
         else:
-            members = group["members"]
+            members = group.get("members", [])
             regex = None
 
         name = kwargs.get("name", group["name"])
         description = kwargs.get("description", group["description"])
         importance = kwargs.get("importance", group["importance"])
+
+        # Transform existing members into flat list as API returns dicts for host & account groups
+        if kwargs.get("append", False):
+            if group["type"] in ["domain", "ip"]:
+                for member in group["members"]:
+                    members.append(member)
+            else:
+                for member in group["members"]:
+                    members.append(member["id"])
+        # Ensure members are unique
+        members = list(set(members))
 
         if regex is None:
             # Static POST body
@@ -1576,36 +1716,33 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             method="get",
             url=f"{self.url}/users/roles",
         )
-        
+
     def get_user_by_name(self, username=None, **kwargs):
         """
-        :param username: Value contained in the name field. 
-        :rtype: list
+        :param username: Value contained in the name field.
+        :rtype: dict
         """
         if username is None:
-            raise ValueError(
-                "Must provide a name."
-            )
-        users_list = []
+            raise ValueError("Must provide a name.")
         for users in self.get_all_users():
             for user in users.json()["results"]:
-                if username in user["name"]:
-                    users_list.append(user)
-        return users_list
-        
+                if username == user["name"]:
+                    return user
+        return {}
+
     def get_user_by_email(self, email=None, **kwargs):
         """
         :param email: The email to be queried
         :rtype: dict
         """
         if email is None:
-            raise ValueError(
-                "Must provide an email."
-            )
-        for users in self.get_all_users(email=email):
-            for user in users.json()["results"]:
-                return user
-        
+            raise ValueError("Must provide an email.")
+        params = self._generate_user_params(kwargs)
+        return self._request(
+            method="get",
+            url=f"{self.url}/users",
+            params=params,
+        )
 
     def create_user(self, **kwargs):
         roles = self.get_user_roles()

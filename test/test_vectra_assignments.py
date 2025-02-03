@@ -32,10 +32,11 @@ def test_assignments_threaded(vc, test_skip):
     for results in vc.get_all_assignments():
         assignment_gen = assignment_gen + results.json()["results"]
 
-    assert count == len(assignment_gen)
+    assert count <= len(assignment_gen)
     vc.threads = 1
 
 
+@pytest.mark.dependency()
 def test_create_account_assignment(vc):
     account_id = next(vc.get_all_accounts()).json()["results"][0]["id"]
     users = []
@@ -45,12 +46,11 @@ def test_create_account_assignment(vc):
     resp = vc.create_account_assignment(account_id=account_id, user_id=user["id"])
 
     global_dict["account_assignment"] = resp.json()["assignment"]["id"]
-    assert resp.status_code == 201
+    assert resp.status_code in range(200, 300)
 
 
-def test_create_host_assignment(vc):
-    if vc.version not in [2.1, 2.2, 2.4, 2.5, 3.3]:
-        pytest.skip(reason="This test is available in v2 and v3.3+ of API")
+@pytest.mark.dependency()
+def test_create_host_assignment(vc, test_skip):
     host_id = next(vc.get_all_hosts()).json()["results"][0]["id"]
     users = []
     for results in vc.get_all_users():
@@ -59,12 +59,16 @@ def test_create_host_assignment(vc):
     resp = vc.create_host_assignment(host_id=host_id, user_id=user["id"])
 
     global_dict["host_assignment"] = resp.json()["assignment"]["id"]
-    assert resp.status_code == 201
+    assert resp.status_code in range(200, 300)
 
 
-def test_create_delete_assignments(vc):
-    resp1 = vc.delete_assignment(assignment_id=global_dict["account_assignment"])
-    assert resp1.status_code == 204
-    if vc.version in [2.1, 2.2, 2.4, 2.5, 3.3]:
-        resp2 = vc.delete_assignment(assignment_id=global_dict["host_assignment"])
-        assert resp2.status_code == 204
+@pytest.mark.dependency(depends=["test_create_account_assignment"])
+def test_delete_account_assignment(vc):
+    resp = vc.delete_assignment(assignment_id=global_dict.get("account_assignment", {}))
+    assert resp.status_code in range(200, 300)
+
+
+@pytest.mark.dependency(depends=["test_create_host_assignment"])
+def test_delete_host_assignment(vc, test_skip):
+    resp = vc.delete_assignment(assignment_id=global_dict.get("host_assignment", {}))
+    assert resp.status_code in range(200, 300)

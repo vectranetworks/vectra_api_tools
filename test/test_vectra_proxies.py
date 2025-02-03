@@ -20,7 +20,7 @@ def test_proxy_get(vc, test_skip):
 
     assert resp.status_code == 200
 
-
+@pytest.mark.dependency()
 def test_proxy_add(vc, test_skip):
     resp = vc.add_proxy(address="169.254.254.254", enable=True)
 
@@ -32,7 +32,7 @@ def test_proxy_add(vc, test_skip):
     assert proxy["ip"] == "169.254.254.254"
     assert proxy["considerProxy"] is True
 
-
+@pytest.mark.dependency(depends=["test_proxy_add"])
 def test_proxy_address_update(vc, test_skip):
     resp = vc.update_proxy(proxy_id=global_proxy["id"], address="169.254.254.253")
 
@@ -41,7 +41,7 @@ def test_proxy_address_update(vc, test_skip):
     assert proxy["ip"] == "169.254.254.253"
     assert proxy["considerProxy"] is True
 
-
+@pytest.mark.dependency(depends=["test_proxy_add"])
 def test_proxy_state_update(vc, test_skip):
     resp = vc.update_proxy(proxy_id=global_proxy["id"], enable=False)
     if resp.status_code == 403:
@@ -60,7 +60,7 @@ def test_proxy_state_update(vc, test_skip):
         if p["address"] == proxy["ip"]:
             global_proxy["id"] = p["id"]
 
-
+@pytest.mark.dependency(depends=["test_proxy_add"])
 def test_proxy_delete(vc, test_skip):
     resp = vc.delete_proxy(proxy_id=global_proxy["id"])
 

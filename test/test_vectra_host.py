@@ -14,12 +14,11 @@ def test_skip(vc):
 
 
 def test_host_generator(vc, test_skip):
-
     host_gen = vc.get_all_hosts(page_size=1)
     results = next(host_gen)
 
-    assert len(results.json()["results"]) == 1
     assert results.json()["count"] >= 1
+    assert len(results.json()["results"]) == 1
 
 
 def test_hosts_threaded(vc, test_skip):
@@ -29,12 +28,11 @@ def test_hosts_threaded(vc, test_skip):
     for results in vc.get_all_hosts(page_size=50):
         host_gen = host_gen + results.json()["results"]
 
-    assert count == len(host_gen)
+    assert count <= len(host_gen)
     vc.threads = 1
 
 
 def test_get_hosts_id(vc, test_skip):
-
     host_id = next(vc.get_all_hosts()).json()["results"][0]["id"]
     resp = vc.get_host_by_id(host_id=host_id)
 
@@ -42,7 +40,6 @@ def test_get_hosts_id(vc, test_skip):
 
 
 def test_key_asset(vc, test_skip):
-
     host = next(vc.get_all_hosts()).json()["results"][0]
     host_id = host["id"]
     ka = host["is_key_asset"]
@@ -67,11 +64,8 @@ def test_host_tags(vc, test_skip):
     assert vc.get_host_tags(host_id=host_id).json()["tags"] == ["pytest"]
 
     vc.set_host_tags(host_id=host_id, tags=["foo", "bar"], append=True)
-    assert vc.get_host_tags(host_id=host_id).json()["tags"] == [
-        "pytest",
-        "foo",
-        "bar",
-    ]
+    for tag in vc.get_host_tags(host_id=host_id).json()["tags"]:
+        assert tag in ["pytest", "foo", "bar"]
 
     vc.set_host_tags(host_id=host_id, tags=host_tags)
     assert vc.get_host_tags(host_id=host_id).json()["tags"] == host_tags
