@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vectra-api-tools"
-version = "3.4.0"
+version = "3.4.1_rc1"
 authors = [
   { name="Brandon Wyatt", email="bwyatt@vectra.ai" },
   { name="Vectra", email="tme@vectra.ai" },
@@ -15,7 +15,7 @@ requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: Apache Software License",
-    "Operating System :: OS Independent", 
+    "Operating System :: OS Independent",
 ]
 dependencies = ["requests", "pytz", "cabby", "stix", "backoff", "pytest-dependency"]
 

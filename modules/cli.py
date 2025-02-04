@@ -29,6 +29,3 @@ def commonArgs(parser):
 
 def getPassword():
     return getpass.getpass(prompt='Please enter password')
-
-
-

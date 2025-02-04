@@ -6,7 +6,7 @@ requests.packages.urllib3.disable_warnings()
 
 @pytest.fixture()
 def test_skip(vc):
-    if vc.version not in [3.1, 3.2, 3.3, 3.4]:
+    if vc.version < 3.1:
         pytest.skip(
             allow_module_level=True,
             reason="Method is accessible via v3+ of API",

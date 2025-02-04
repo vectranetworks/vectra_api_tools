@@ -1,4 +1,3 @@
-import pytest
 import requests
 
 requests.packages.urllib3.disable_warnings()
@@ -63,9 +62,9 @@ def test_mark_detections_as_fixed(vc):
     assert vc.mark_detections_fixed(detection_ids=det_ids).status_code == 200
     resp = next(vc.get_all_detections())
     assert resp.status_code == 200
-    assert all([d["state"] == "fixed" for d in resp.json()["results"]])
+    assert all({d["state"] == "fixed" for d in resp.json()["results"]})
 
     assert vc.unmark_detections_fixed(detection_ids=det_ids).status_code == 200
     resp = next(vc.get_all_detections())
     assert resp.status_code == 200
-    assert not any([d["state"] == "fixed" for d in resp.json()["results"]])
+    assert not any({d["state"] == "fixed" for d in resp.json()["results"]})
