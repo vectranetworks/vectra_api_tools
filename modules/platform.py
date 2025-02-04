@@ -1638,7 +1638,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
         elif regex := kwargs.get("regex"):
             pass
         else:
-            members = group.get("members", [])
+            members = list(group.get("members", []))
             regex = None
 
         name = kwargs.get("name", group["name"])
