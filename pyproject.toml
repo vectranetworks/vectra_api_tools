@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "vectra-api-tools"
-version = "3.4.0"
+version = "3.4.1"
 authors = [
   { name="Brandon Wyatt", email="bwyatt@vectra.ai" },
   { name="Vectra", email="tme@vectra.ai" },
