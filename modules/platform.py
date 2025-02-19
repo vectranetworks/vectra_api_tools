@@ -5,20 +5,16 @@ import logging
 import sys
 import time
 import warnings
-from os import environ
 from pathlib import Path
 
 import backoff
 import requests
 
-if environ.get("PYTEST_VERSION") is not None:
-    from .vectra import HTTPException, VectraClientV2_5, _generate_params
-else:
-    from vat.vectra import (
-        HTTPException,
-        VectraClientV2_5,
-        _generate_params,
-    )
+from vat.vectra import (
+    HTTPException,
+    VectraClientV2_5,
+    _generate_params,
+)
 
 warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
@@ -1638,7 +1634,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
         elif regex := kwargs.get("regex"):
             pass
         else:
-            members = list(group.get("members", []))
+            members = []
             regex = None
 
         name = kwargs.get("name", group["name"])
