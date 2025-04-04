@@ -263,7 +263,7 @@ class VectraClientV2_5:
         if method not in ["get", "patch", "put", "post", "delete"]:
             raise ValueError("Invalid requests method provided")
 
-        if "headers" in kwargs.keys():
+        if "headers" in kwargs:
             headers = kwargs.pop("headers")
         else:
             headers = self.headers
@@ -420,7 +420,8 @@ class VectraClientV2_5:
         Generator to retrieve all accounts - all parameters are optional
         :param all: does nothing
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
-        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param c_score_gte: certainty score greater than or equal to (int) - will be removed
+            with deprecation of v1 of api
         :param certainty: certainty score (int)
         :param certainty_gte: certainty score greater than or equal to (int)
         :param fields: comma separated string of fields to be filtered and returned
@@ -636,7 +637,8 @@ class VectraClientV2_5:
             3: false_positive
         :param note: Note to add to fixed/triaged detections
         :param triage_as: One-time triage detection(s) and rename as (str).
-        :param mark_as_fixed: mark the detection(s) as fixed (bool). Custom triage_as and mark_as_fixed are mutually exclusive.
+        :param mark_as_fixed: mark the detection(s) as fixed (bool). Custom triage_as and
+            mark_as_fixed are mutually exclusive.
         :param detection_ids: list of detection IDs to fix/triage
         """
         if not triage_as and not mark_as_fixed:
@@ -781,7 +783,8 @@ class VectraClientV2_5:
         :param state: campaign state, possible values are: init, active, closed, closed_never_active
         :param name: filter on campaign name
         :param last_updated_gte: return only campaigns with a last updated timestamp gte (datetime)
-        :param note_modified_timestamp_gte: return only campaigns with a last updated timestamp on their note gte (datetime)
+        :param note_modified_timestamp_gte: return only campaigns with a last updated timestamp on
+            their note gte (datetime)
         :param fields: comma separated string of fields to be filtered and returned
             possible values are: id, dst_ip, target_domain, state, name, last_updated,
             note, note_modified_by, note_modified_timestamp
@@ -854,7 +857,8 @@ class VectraClientV2_5:
 
         Valid params in the dict
                 :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
-        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with
+            deprecation of v1 of api
         :param category: detection category - will be removed with deprecation of v1 of api
         :param certainty: certainty score (int)
         :param certainty_gte: certainty score greater than or equal to (int)
@@ -881,7 +885,8 @@ class VectraClientV2_5:
         :param src_ip: source ip address of host attributed to detection
         :param state: state of detection (active/inactive)
         :param t_score: threat score (int) - will be removed with deprecation of v1 of api
-        :param t_score_gte: threat score is greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param t_score_gte: threat score is greater than or equal to (int) - will be removed with
+            deprecation of v1 of api
         :param tags: tags assigned to detections; this uses substring matching
         :param targets_key_asset: detection targets key asset (bool) - will be removed with deprecation of v1 of api
         :param threat: threat score (int)
@@ -1039,7 +1044,7 @@ class VectraClientV2_5:
         )
 
     @validate_gte_api_v2
-    def set_detection_tags(self, detection_id=None, tags=[], append=False):
+    def set_detection_tags(self, detection_id=None, tags=None, append=False):
         """
         Set  detection tags
         :param detection_id:
@@ -1132,7 +1137,8 @@ class VectraClientV2_5:
         :param domains: search for groups containing those domains (list)
         :param host_ids: search for groups containing those host IDs (list)
         :param host_names: search for groups containing those hosts (list)
-        :param importance: search for groups of this specific importance (One of "high", "medium", "low", or "never_prioritize")
+        :param importance: search for groups of this specific importance (One of "high", "medium",
+            "low", or "never_prioritize")
         :param ips: search for groups containing those IPs (list)
         :param last_modified_by: username of last person to modify this group
         :param last_modified_timestamp: timestamp of last modification of group (datetime)
@@ -1161,11 +1167,9 @@ class VectraClientV2_5:
         """
         return self._request(method="get", url=f"{self.url}/groups/{group_id}")
 
-
-
     @validate_gte_api_v3_2
     def update_group(
-        self, group_id, name=None, description="", members=[], append=False, **kwargs
+        self, group_id, name=None, description="", members=None, append=False, **kwargs
     ):
         """
         Update group
@@ -1278,10 +1282,12 @@ class VectraClientV2_5:
         :rtype: dict
 
         Valid params in the dict
-        :param all: if set to False, endpoint will only return hosts that have active detections, active traffic or are marked as key assets - default False
+        :param all: if set to False, endpoint will only return hosts that have active detections,
+            active traffic or are marked as key assets - default False
         :param active_traffic: only return hosts that have seen traffic in the last 2 hours (bool)
         :param c_score: certainty score (int) - will be removed with deprecation of v1 of api
-        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with deprecation of v1 of api
+        :param c_score_gte: certainty score greater than or equal to (int) - will be removed with
+            deprecation of v1 of api
         :param certainty: certainty score (int)
         :param certainty_gte: certainty score greater than or equal to (int)
         :param fields: comma separated string of fields to be filtered and returned
@@ -1450,7 +1456,7 @@ class VectraClientV2_5:
         )
 
     @validate_gte_api_v3_3
-    def set_host_tags(self, host_id=None, tags=[], append=False):
+    def set_host_tags(self, host_id=None, tags=None, append=False):
         """
         Set host tags
         :param host_id:
@@ -1794,17 +1800,16 @@ class VectraClientV2_5:
                 'The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter'
             )
             return self.get_rules_by_name(triage_category=name)
-        elif rule_id:
+        if rule_id:
             deprecation(
                 'The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function'
             )
             return self.get_rule_by_id(rule_id)
-        else:
-            return self._request(
-                method="get",
-                url=f"{self.url}/rules",
-                params=self._generate_rule_params(kwargs),
-            )
+        return self._request(
+            method="get",
+            url=f"{self.url}/rules",
+            params=self._generate_rule_params(kwargs),
+        )
 
     @validate_gte_api_v2
     def get_rules_by_name(self, triage_category=None, description=None):
@@ -1819,7 +1824,7 @@ class VectraClientV2_5:
         return self.get_rules(contains=search_query)
 
     @validate_api_v2
-    def mark_detections_custom(self, detection_ids=[], triage_category=None):
+    def mark_detections_custom(self, detection_ids=None, triage_category=None):
         """
         Mark detections as custom
         :param detection_ids: list of detection IDs to mark as custom
@@ -1834,7 +1839,7 @@ class VectraClientV2_5:
         return self._request(method="post", url=f"{self.url}/rules", json=payload)
 
     @validate_api_v2
-    def unmark_detections_custom(self, detection_ids=[]):
+    def unmark_detections_custom(self, detection_ids=None):
         """
         Unmark detection as custom
         :param detection_ids: list of detection IDs to unmark as custom
@@ -1847,7 +1852,8 @@ class VectraClientV2_5:
 
         response = self._request(method="delete", url=f"{self.url}/rules", json=payload)
 
-        # DELETE returns an empty response, but we populate the response for consistency with the mark_as_fixed() function
+        # DELETE returns an empty response, but we populate the response for consistency with the
+        #   mark_as_fixed() function
         json_dict = {
             "_meta": {"message": "Successfully unmarked detections", "level": "Success"}
         }
@@ -2061,7 +2067,7 @@ class VectraClientV2_5:
         return self._request(method="get", url=f"{self.url}/settings/internal_network")
 
     @validate_api_v2
-    def set_internal_networks(self, include=[], exclude=[], drop=[], append=True):
+    def set_internal_networks(self, include=None, exclude=None, drop=None, append=True):
         """
         Set internal networks configured on the brain
         :param include: list of subnets to add the internal subnets list
@@ -2069,6 +2075,10 @@ class VectraClientV2_5:
         :param drop: list of subnets to add to the drop list
         :param append: overwrites existing lists if set to False, appends to existing lists if set to True
         """
+        drop = [] if drop is None else drop
+        exclude = [] if exclude is None else exclude
+        include = [] if include is None else include
+
         # Check that all provided ranges are valid
         all(ipaddress.ip_network(i) for i in include + exclude + drop)
 
@@ -2261,7 +2271,7 @@ class VectraClientV2_5:
         )
 
     @validate_gte_api_v2
-    def set_account_tags(self, account_id=None, tags=[], append=False):
+    def set_account_tags(self, account_id=None, tags=None, append=False):
         """
         Set account tags
         :param account_id: ID of the account for which to set the tags
@@ -2391,7 +2401,8 @@ class VectraClientV2_5:
     def get_all_sensor_traffic_stats(self, sensor_luid=None):
         """
         Generator to get all traffic stats from a sensor
-        :param sensor_luid: LUID of the sensor for which to get the stats. Can be retrieved in the UI under Manage > Sensors
+        :param sensor_luid: LUID of the sensor for which to get the stats. Can be retrieved in the
+            UI under Manage > Sensors
         """
         url = f"{self.url}/traffic/{sensor_luid}"
         if not sensor_luid:
@@ -2586,7 +2597,7 @@ class VectraClientV2_5:
         Get all currently available devices
         """
         return requests.get(
-            "{url}/vectra-match/available-devices".format(url=self.url),
+            f"{self.url}/vectra-match/available-devices",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2605,9 +2616,7 @@ class VectraClientV2_5:
             raise TypeError("Device serial must be of type string")
 
         return requests.get(
-            "{url}/vectra-match/enablement?device_serial={device_serial}".format(
-                url=self.url, device_serial=device_serial
-            ),
+            f"{self.url}/vectra-match/enablement?device_serial={device_serial}",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2636,7 +2645,7 @@ class VectraClientV2_5:
         payload = {"device_serial": device_serial, "desired_state": state}
 
         return requests.post(
-            "{url}/vectra-match/enablement".format(url=self.url),
+            f"{self.url}/vectra-match/enablement",
             headers=self.headers,
             json=payload,
             verify=self.verify,
@@ -2655,14 +2664,12 @@ class VectraClientV2_5:
 
         if device_serial:
             return requests.get(
-                "{url}/vectra-match/status?device_serial={device_serial}".format(
-                    url=self.url, device_serial=device_serial
-                ),
+                f"{self.url}/vectra-match/status?device_serial={device_serial}",
                 headers=self.headers,
                 verify=self.verify,
             )
         return requests.get(
-            "{url}/vectra-match/status".format(url=self.url),
+            f"{self.url}/vectra-match/status",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2680,14 +2687,12 @@ class VectraClientV2_5:
 
         if device_serial:
             return requests.get(
-                "{url}/vectra-match/stats?device_serial={device_serial}".format(
-                    url=self.url, device_serial=device_serial
-                ),
+                f"{self.url}/vectra-match/stats?device_serial={device_serial}",
                 headers=self.headers,
                 verify=self.verify,
             )
         return requests.get(
-            "{url}/vectra-match/stats".format(url=self.url),
+            f"{self.url}/vectra-match/stats",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2705,14 +2710,12 @@ class VectraClientV2_5:
 
         if device_serial:
             return requests.get(
-                "{url}/vectra-match/alert-stats?device_serial={device_serial}".format(
-                    url=self.url, device_serial=device_serial
-                ),
+                f"{self.url}/vectra-match/alert-stats?device_serial={device_serial}",
                 headers=self.headers,
                 verify=self.verify,
             )
         return requests.get(
-            "{url}/vectra-match/alert-stats".format(url=self.url),
+            f"{self.url}/vectra-match/alert-stats",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2732,7 +2735,7 @@ class VectraClientV2_5:
             raise TypeError("UUID must be of type string")
 
         return requests.get(
-            "{url}/vectra-match/rules?uuid={uuid}".format(url=self.url, uuid=uuid),
+            f"{self.url}/vectra-match/rules?uuid={uuid}",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2765,7 +2768,7 @@ class VectraClientV2_5:
         del headers["Content-Type"]
 
         return requests.post(
-            "{url}/vectra-match/rules".format(url=self.url),
+            f"{self.url}/vectra-match/rules",
             headers=headers,
             files={"file": rule_file},
             data=payload,
@@ -2789,7 +2792,7 @@ class VectraClientV2_5:
         payload = {"uuid": uuid}
 
         return requests.delete(
-            "{url}/vectra-match/rules".format(url=self.url),
+            f"{self.url}/vectra-match/rules",
             headers=self.headers,
             json=payload,
             verify=self.verify,
@@ -2803,7 +2806,7 @@ class VectraClientV2_5:
         """
 
         return requests.get(
-            "{url}/vectra-match/assignment".format(url=self.url),
+            f"{self.url}/vectra-match/assignment",
             headers=self.headers,
             verify=self.verify,
         )
@@ -2832,7 +2835,7 @@ class VectraClientV2_5:
         payload = {"uuid": uuid, "device_serials": device_list}
 
         return requests.post(
-            "{url}/vectra-match/assignment".format(url=self.url),
+            f"{self.url}/vectra-match/assignment",
             headers=self.headers,
             json=payload,
             verify=self.verify,
@@ -2862,7 +2865,7 @@ class VectraClientV2_5:
         payload = {"uuid": uuid, "device_serial": device_serial}
 
         return requests.delete(
-            "{url}/vectra-match/assignment".format(url=self.url),
+            f"{self.url}/vectra-match/assignment",
             headers=self.headers,
             json=payload,
             verify=self.verify,
@@ -2972,7 +2975,9 @@ class VectraClientV2_5:
         )
 
     @validate_gte_api_v3_2
-    def create_group(self, name=None, description="", type=None, members=[], **kwargs):
+    def create_group(
+        self, name=None, description="", type=None, members=None, **kwargs
+    ):
         """
         Create group
         :param name: name of the group to create
