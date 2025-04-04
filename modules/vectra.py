@@ -40,28 +40,23 @@ class HTTPException(Exception):
 
 
 class HTTPUnauthorizedException(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    """Catch 401 Unauthorized Exceptions"""
 
 
 class HTTPAlreadyExists(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    """Catch 409 Already Exists"""
 
 
 class HTTPRequestEntityTooLarge(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    """Catch 413 Rquest Entity Too Large"""
 
 
 class HTTPUnprocessableContentException(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    """Catch 422 Unprocessable Content"""
 
 
 class HTTPTooManyRequestsException(HTTPException):
-    def __init__(self, response):
-        super().__init__(response)
+    """Catch 429 Too Many Rquests"""
 
 
 def request_error_handler(func):
@@ -92,6 +87,7 @@ def request_error_handler(func):
 
 
 def deprecation(message):
+    """Decorator for deprecated methods"""
     warnings.warn(message, PendingDeprecationWarning)
 
 

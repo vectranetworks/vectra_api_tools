@@ -1,24 +1,17 @@
 """
 Setup testing environment
 """
+
 import pytest
-import requests
+from urllib3 import disable_warnings
 
 from ..modules import platform
 from ..modules import vectra
 
 VectraClient = {
     # Vectra Detect client implementations
-    "1": vectra.VectraBaseClient,
-    "2.1": vectra.VectraClientV2_1,
-    "2.2": vectra.VectraClientV2_2,
-    "2.4": vectra.VectraClientV2_4,
     "2.5": vectra.VectraClientV2_5,
     # Vectra Platform client implementations
-    "3": platform.VectraPlatformClientV3,
-    "3.1": platform.VectraPlatformClientV3_1,
-    "3.2": platform.VectraPlatformClientV3_2,
-    "3.3": platform.VectraPlatformClientV3_3,
     "3.4": platform.VectraPlatformClientV3_4,
 }
 
@@ -33,7 +26,7 @@ def pytest_addoption(parser):
     parser.addoption("--user", help="username")
     parser.addoption("--password", help="password")
     parser.addoption("--token", help="token")
-    parser.addoption("--client_ver", help='|'.join(VectraClient.keys()))
+    parser.addoption("--client_ver", help="|".join(VectraClient.keys()))
 
 
 @pytest.fixture(scope="module")
@@ -41,18 +34,13 @@ def vc(request):
     """
     Create Vectra Client object
     """
-    requests.packages.urllib3.disable_warnings()
+    disable_warnings()
 
     client_ver = float(request.config.getoption("--client_ver"))
     if client_ver == 2:
-        raise ValueError(f"--client-ver must be one of {', '.join(VectraClient.keys())}")
-
-    if client_ver < 2:
-        brain = request.config.getoption("--url")
-        username = request.config.getoption("--user")
-        passwd = request.config.getoption("--password")
-
-        return vectra.VectraBaseClient(url=brain, user=username, password=passwd)
+        raise ValueError(
+            f"--client-ver must be one of {', '.join(VectraClient.keys())}"
+        )
 
     if 2 < client_ver < 3:
         version = request.config.getoption("--client_ver")

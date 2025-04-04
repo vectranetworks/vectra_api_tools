@@ -1,7 +1,12 @@
-import pytest
-import requests
+"""
+Test the /entities API endpoint (v3.x / RUX only)
+"""
 
-requests.packages.urllib3.disable_warnings()
+import pytest
+
+from urllib3 import disable_warnings
+
+disable_warnings()
 
 
 @pytest.fixture()

@@ -16,9 +16,20 @@ if sys.version_info.major == 3:
 
 
 class TaxiiClient(object):
-    def __init__(self, url=None, discovery_path=None, https=True, username=None, password=None, cert=None, key=None):
+    def __init__(
+        self,
+        url=None,
+        discovery_path=None,
+        https=True,
+        username=None,
+        password=None,
+        cert=None,
+        key=None,
+    ):
         self.client = create_client(url, use_https=https, discovery_path=discovery_path)
-        self.client.set_auth(username=username, password=password, cert_file=cert, key_file=key)
+        self.client.set_auth(
+            username=username, password=password, cert_file=cert, key_file=key
+        )
 
     def discovery(self, uri=None):
         if uri:
@@ -42,7 +53,9 @@ class TaxiiClient(object):
             duration = int(duration)
 
         begin_date = datetime.datetime.today() - datetime.timedelta(duration)
-        begin_date = begin_date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=pytz.utc)
+        begin_date = begin_date.replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=pytz.utc
+        )
         packages = self.client.poll(collection_name=feed, begin_date=begin_date)
 
         return self._generate_stix_package(packages)
@@ -60,12 +73,14 @@ class TaxiiClient(object):
         return compiled_package
 
     @staticmethod
-    def write_stix_file(stix_package, dir='/tmp'):
-        ext = ''.join([random.choice(string.ascii_letters + string.digits) for n in range(10)])
-        fd = open('{0}/stix_{1}'.format(dir, str(ext)), 'w')
+    def write_stix_file(stix_package, dir="/tmp"):
+        ext = "".join(
+            [random.choice(string.ascii_letters + string.digits) for n in range(10)]
+        )
+        fd = open("{0}/stix_{1}".format(dir, str(ext)), "w")
         if pyversion == 2:
-            fd.write(stix_package.to_xml(encoding='utf-8'))
+            fd.write(stix_package.to_xml(encoding="utf-8"))
         if pyversion == 3:
-            fd.write(stix_package.to_xml(encoding='utf-8').decode())
+            fd.write(stix_package.to_xml(encoding="utf-8").decode())
         fd.close()
         return fd.name

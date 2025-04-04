@@ -1,5 +1,9 @@
 import pytest
 
+from urllib3 import disable_warnings
+
+disable_warnings()
+
 
 @pytest.fixture()
 def test_skip(vc):
@@ -54,13 +58,14 @@ def test_create_group(vc, test_skip):
 
 @pytest.mark.dependency(depends=["test_create_group"])
 def test_get_group_by_id(vc, test_skip):
+    """
+    Find the group we created in test_create_group
+    """
     groups = []
     for results in vc.get_all_groups():
         groups = groups + results.json()["results"]
 
-    for group in groups:
-        if group["name"] == "pytest group":
-            test_group = group
+    test_group = [x for x in groups if x["name"] == "pytest group"][0]
 
     resp = vc.get_group_by_id(test_group["id"])
     assert resp.json()["id"] == test_group["id"]
