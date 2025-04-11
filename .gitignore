@@ -2,7 +2,6 @@
 .DS_Store
 .coverage
 .env
-.gitignore
 .pdm-python
 .pytest_cache
 .vscode

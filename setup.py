@@ -8,7 +8,7 @@ setup(
     description="Vectra API client library",
     long_description=long_desc,
     long_description_content_type="text/markdown",
-    version="3.4.0",
+    version="3.4.10",
     author="Vectra",
     author_email="bwyatt@vectra.ai",
     url="https://github.com/vectranetworks/vectra_api_tools",

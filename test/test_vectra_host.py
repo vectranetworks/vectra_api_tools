@@ -1,7 +1,8 @@
 import pytest
-import requests
 
-requests.packages.urllib3.disable_warnings()
+from urllib3 import disable_warnings
+
+disable_warnings()
 
 
 @pytest.fixture()

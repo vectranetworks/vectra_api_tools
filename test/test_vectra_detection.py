@@ -1,6 +1,6 @@
-import requests
+from urllib3 import disable_warnings
 
-requests.packages.urllib3.disable_warnings()
+disable_warnings()
 
 
 def test_detection_generator(vc):

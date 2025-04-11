@@ -1,8 +1,7 @@
 import pytest
-import requests
+from urllib3 import disable_warnings
 
-requests.packages.urllib3.disable_warnings()
-
+disable_warnings()
 test_vars = {}
 
 

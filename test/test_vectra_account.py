@@ -1,6 +1,10 @@
-import requests
+"""
+Test the /accounts API Endpoint
+"""
 
-requests.packages.urllib3.disable_warnings()
+from urllib3 import disable_warnings
+
+disable_warnings()
 
 
 def test_account_generator(vc):
@@ -23,6 +27,9 @@ def test_accounts_threaded(vc):
 
 
 def test_get_accounts_id(vc):
+    """
+    Test a random account, and attempt to fetch it by the ID obtained
+    """
     account_id = next(vc.get_all_accounts()).json()["results"][0]["id"]
     resp = vc.get_account_by_id(account_id=account_id)
 
@@ -30,6 +37,9 @@ def test_get_accounts_id(vc):
 
 
 def test_account_tags(vc):
+    """
+    Test Account Tags
+    """
     account = next(vc.get_all_accounts()).json()["results"][0]
     account_id = account["id"]
     account_tags = account["tags"]
