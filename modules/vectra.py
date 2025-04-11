@@ -16,11 +16,13 @@ warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
 
 class HTTPException(Exception):
+    """
+    Custom exception class to report possible API errors
+    The body is constructed by extracting the API error code from the requests.Response object
+    """
+
     def __init__(self, response):
-        """
-        Custom exception class to report possible API errors
-        The body is constructed by extracting the API error code from the requests.Response object
-        """
+
         try:
             r = response.json()
             if "detail" in r:
@@ -86,11 +88,6 @@ def request_error_handler(func):
     return request_handler
 
 
-def deprecation(message):
-    """Decorator for deprecated methods"""
-    warnings.warn(message, PendingDeprecationWarning)
-
-
 def param_deprecation(key):
     message = f"{key} will be deprecated with Vectra API which will be announced in an upcoming release"
     warnings.warn(message, PendingDeprecationWarning)
@@ -113,19 +110,20 @@ def _generate_params(args, valid_keys, deprecated_keys):
     return params
 
 
-# Validate methods available in V2 and V3.2+
 def validate_gte_api_v3_2(func):
+    """Validate methods available in V2 and V3.2+"""
+
     def api_validator(self, *args, **kwargs):
         if self.version < 3 or self.version >= 3.2:
             return func(self, *args, **kwargs)
-        else:
-            raise NotImplementedError("Method is accessible via v2 or v3.2+ of API")
+        raise NotImplementedError("Method is accessible via v2 or v3.2+ of API")
 
     return api_validator
 
 
-# Validate Methods available in V2 and V3.3+
 def validate_gte_api_v3_3(func):
+    """Validate Methods available in V2 and V3.3+"""
+
     def api_validator(self, *args, **kwargs):
         if self.version < 3 or self.version >= 3.3:
             return func(self, *args, **kwargs)
@@ -134,33 +132,13 @@ def validate_gte_api_v3_3(func):
     return api_validator
 
 
-# Validate methods available in V2 and V3
-def validate_gte_api_v2(func):
-    def api_validator(self, *args, **kwargs):
-        if self.version > 2:
-            return func(self, *args, **kwargs)
-        else:
-            raise NotImplementedError("Method is only accessible via v2+ of API")
-
-    return api_validator
-
-
-# Validate methods only available in V2
 def validate_api_v2(func):
+    """Validate methods only available in V2"""
+
     def api_validator(self, *args, **kwargs):
         if 3 > self.version >= 2:
             return func(self, *args, **kwargs)
         raise NotImplementedError("Method is only accessible via v2 of API")
-
-    return api_validator
-
-
-# Validate methods only available in V3
-def validate_api_v3(func):
-    def api_validator(self, *args, **kwargs):
-        if self.version >= 3:
-            return func(self, *args, **kwargs)
-        raise NotImplementedError("Method is not accessible via v2 of API")
 
     return api_validator
 
@@ -182,14 +160,13 @@ class VectraClientV2_5:
 
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
         secret_key=None,
         verify=False,
         threads=1,
+        timeout=30,
     ):
         """
         Initialize Vectra client
@@ -197,14 +174,14 @@ class VectraClientV2_5:
         :param client_id: Client ID for authentication when using API v3*
         :param secret_key: Secret Key for authentication when using API v3*
         :param token: API token for authentication when using API v2*
-        :param user: Username to authenticate to Vectra brain when using API v1*
-        :param password: Password when using username to authenticate using API v1*
         :param verify: Verify SSL (default: False) - optional
         :param threads: Number of threads to use for paginated endpoints (default: 1) - optional
-        *Either client_id, token, or user are required
+        :param timeout: HTTP timeout in seconds (default 30)
+        *Either client_id or token are required
+
         """
         self.verify = verify
-        self.timeout = 30
+        self.timeout = timeout
         if threads <= 1:
             self.threads = 1
         elif threads >= 8:
@@ -227,20 +204,12 @@ class VectraClientV2_5:
                 "Content-Type": "application/json",
                 "Cache-Control": "no-cache",
             }
-        elif user and password and self.VERSION1 is not None:
-            self.version = self.VERSION1
-            self.url = f"{url}/api"
-            self.auth = (user, password)
-            deprecation(
-                "Deprecation of the Vectra API v1 will be announced in an upcoming release. Migrate to API v2"
-                " when possible"
-            )
+
         else:
             raise RuntimeError(
                 "At least one form of authentication is required. Please provide "
                 "Client ID and Secret Key for v3, "
-                "token for v2, "
-                "or username and password for v1."
+                "token for v2."
             )
 
     def enable_debug(self):
@@ -273,15 +242,14 @@ class VectraClientV2_5:
                 timeout=self.timeout,
                 **kwargs,
             )
-        else:
-            return requests.request(
-                method=method,
-                url=url,
-                auth=self.auth,
-                verify=self.verify,
-                timeout=self.timeout,
-                **kwargs,
-            )
+        return requests.request(
+            method=method,
+            url=url,
+            auth=self.auth,
+            verify=self.verify,
+            timeout=self.timeout,
+            **kwargs,
+        )
 
     def get_threaded(self, url, count, **kwargs):
         page_size = kwargs.get("params", {}).get("page_size", 5000)
@@ -318,43 +286,7 @@ class VectraClientV2_5:
             count = resp.json()["count"]
             yield from self.get_threaded(resp.url.split("?")[0], count, **kwargs)
 
-    @staticmethod
-    def _generate_campaign_params(args):
-        """
-        Generate query parameters for campaigns based on provided args
-        :param args: dict of keys to generate query params
-        :rtype: dict
-
-        Valid keys in the dict
-        :param dst_ip: filter on campaign destination IP
-        :param target_domain: filter on campaign destination domain
-        :param state: campaign state, possible values are: init, active, closed, closed_never_active
-        :param name: filter on campaign name
-        :param last_updated_gte: return only campaigns with a last updated timestamp gte (datetime)
-        :param note_modified_timestamp_gte: return only campaigns with a last updated timestamp on
-            their note gte (datetime)
-        :param fields: comma separated string of fields to be filtered and returned
-            possible values are: id, dst_ip, target_domain, state, name, last_updated,
-            note, note_modified_by, note_modified_timestamp
-        :param page: page number to return (int)
-        :param page_size: number of object to return in response (int)
-        """
-        valid_keys = [
-            "fields",
-            "dst_ip",
-            "target_domain",
-            "state",
-            "name",
-            "last_updated_gte",
-            "note_modified_timestamp_gte",
-            "page",
-            "page_size",
-        ]
-
-        deprecated_keys = []
-
-        return _generate_params(args, valid_keys, deprecated_keys)
-
+    # /accounts
     @staticmethod
     def _generate_account_params(args):
         """
@@ -398,7 +330,6 @@ class VectraClientV2_5:
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
-    @validate_gte_api_v2
     def delete_account_note(self, account_id=None, note_id=None):
         """
         Set account note
@@ -410,7 +341,6 @@ class VectraClientV2_5:
             method="delete", url=f"{self.url}/accounts/{account_id}/notes/{note_id}"
         )
 
-    @validate_gte_api_v2
     def get_all_accounts(self, **kwargs):
         """
         Generator to retrieve all accounts - all parameters are optional
@@ -457,8 +387,9 @@ class VectraClientV2_5:
 
         yield from self.yield_results(resp, method, params=params)
 
-    @validate_gte_api_v2
-    # TODO remove this function if APIv < 2.2. is officially retired
+    @warnings.deprecated(
+        "This is deprecated as of APIv2.2. Please use get_all_accounts()"
+    )
     def get_account_by_id(self, account_id=None, **kwargs):
         """
         Get account by id
@@ -477,7 +408,6 @@ class VectraClientV2_5:
             params=self._generate_account_params(kwargs),
         )
 
-    @validate_gte_api_v2
     def get_account_note(self, account_id=None):
         """
         Get account notes
@@ -490,7 +420,6 @@ class VectraClientV2_5:
             method="get", url=f"{self.url}/accounts/{account_id}/notes"
         )
 
-    @validate_gte_api_v2
     def set_account_note(self, account_id=None, note=""):
         """
         Set account note
@@ -506,7 +435,6 @@ class VectraClientV2_5:
             method="post", url=f"{self.url}/accounts/{account_id}/notes", json=payload
         )
 
-    @validate_gte_api_v2
     def update_account_note(self, account_id=None, note_id=None, note=""):
         """
         Set account note
@@ -552,7 +480,6 @@ class VectraClientV2_5:
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
-    @validate_gte_api_v2
     def create_account_assignment(self, account_id=None, user_id=None):
         """
         Create new assignment
@@ -578,7 +505,6 @@ class VectraClientV2_5:
         }
         return self._request(method="post", url=f"{self.url}/assignments", json=payload)
 
-    @validate_gte_api_v2
     def delete_assignment(self, assignment_id=None):
         """
         Delete assignment
@@ -588,7 +514,6 @@ class VectraClientV2_5:
             method="delete", url=f"{self.url}/assignments/{assignment_id}"
         )
 
-    @validate_gte_api_v2
     def get_all_assignments(self, **kwargs):
         """
         Generator to retrieve all assignments - all parameters are optional
@@ -615,7 +540,6 @@ class VectraClientV2_5:
 
         yield from self.yield_results(resp, method, params=params)
 
-    @validate_gte_api_v2
     def set_assignment_resolved(
         self,
         assignment_id: int,
@@ -653,7 +577,6 @@ class VectraClientV2_5:
             json=payload,
         )
 
-    @validate_gte_api_v2
     def update_assignment(self, assignment_id=None, user_id=None):
         """
         Update an existing assignment
@@ -666,7 +589,7 @@ class VectraClientV2_5:
         )
 
     # /assignment_outcomes
-    @validate_gte_api_v2
+
     def create_assignment_outcome(self, title: str, category: str):
         """
         Create a new custom Assignment Outcome
@@ -685,7 +608,6 @@ class VectraClientV2_5:
             method="post", url=f"{self.url}/assignment_outcomes", json=payload
         )
 
-    @validate_gte_api_v2
     def delete_assignment_outcome(self, outcome_id: int):
         """
         Delete an existing custom Assignment Outcome
@@ -695,8 +617,7 @@ class VectraClientV2_5:
             method="delete", url=f"{self.url}/assignment_outcomes/{outcome_id}"
         )
 
-    @validate_gte_api_v2
-    def get_all_assignment_outcomes(self, **kwargs):
+    def get_all_assignment_outcomes(self):
         """
         Get the outcome of a given assignment
         :param :
@@ -708,7 +629,6 @@ class VectraClientV2_5:
 
         yield from self.yield_results(resp, method)
 
-    @validate_gte_api_v2
     def get_assignment_outcome_by_id(self, assignment_outcome_id: int):
         """
         Describe an existing Assignment Outcome
@@ -718,7 +638,6 @@ class VectraClientV2_5:
             method="get", url=f"{self.url}/assignment_outcomes/{assignment_outcome_id}"
         )
 
-    @validate_gte_api_v2
     def update_assignment_outcome(self, outcome_id: int, title: str, category: str):
         """
         Update an existing custom Assignment Outcome
@@ -751,21 +670,21 @@ class VectraClientV2_5:
         """
         if start_date is None and end_date is None:
             return self._request(method="get", url=f"{self.url}/audits")
-        elif start_date is None and end_date is not None:
+        if start_date is None and end_date is not None:
             return self._request(
                 method="get", url=f"{self.url}/audits?end={end_date.isoformat()}"
             )
-        elif start_date is not None and end_date is None:
+        if start_date is not None and end_date is None:
             return self._request(
                 method="get", url=f"{self.url}/audits?start={start_date.isoformat()}"
             )
-        else:
-            return self._request(
-                method="get",
-                url=f"{self.url}/audits?start={start_date.isoformat()}&end={end_date.isoformat()}",
-            )
+        return self._request(
+            method="get",
+            url=f"{self.url}/audits?start={start_date.isoformat()}&end={end_date.isoformat()}",
+        )
 
     # /campaigns
+
     @staticmethod
     def _generate_campaign_params(args):
         """
@@ -829,8 +748,8 @@ class VectraClientV2_5:
 
         return self._request(method="get", url=f"{self.url}/campaigns/{campaign_id}")
 
+    @warnings.deprecated("This is deprecated, please use get_all_campaigns()")
     @validate_api_v2
-    # TODO: deprecated in favor of get_all_campaigns
     def get_campaigns(self, **kwargs):
         """
         Query all campaigns - all parameters are optional
@@ -932,7 +851,6 @@ class VectraClientV2_5:
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
-    @validate_gte_api_v2
     def delete_detection_note(self, detection_id=None, note_id=None):
         """
         Set detection note
@@ -944,7 +862,6 @@ class VectraClientV2_5:
             method="delete", url=f"{self.url}/detections/{detection_id}/notes/{note_id}"
         )
 
-    @validate_gte_api_v2
     def get_all_detections(self, **kwargs):
         """
         Generator to retrieve all detections - all parameters are optional
@@ -962,7 +879,6 @@ class VectraClientV2_5:
 
         yield from self.yield_results(resp, method, params=params)
 
-    @validate_gte_api_v2
     def get_detection_by_id(self, detection_id=None, **kwargs):
         """
         Get detection by id
@@ -984,7 +900,6 @@ class VectraClientV2_5:
             params=self._generate_detection_params(kwargs),
         )
 
-    @validate_gte_api_v2
     def get_detection_note(self, detection_id=None):
         """
         Get detection notes
@@ -1021,7 +936,6 @@ class VectraClientV2_5:
         response._content = json.dumps(json_dict).encode("utf-8")
         return response
 
-    @validate_gte_api_v2
     def set_detection_note(self, detection_id=None, note=""):
         """
         Set detection note
@@ -1039,7 +953,6 @@ class VectraClientV2_5:
             json=payload,
         )
 
-    @validate_gte_api_v2
     def set_detection_tags(self, detection_id=None, tags=None, append=False):
         """
         Set  detection tags
@@ -1064,7 +977,6 @@ class VectraClientV2_5:
             json=payload,
         )
 
-    @validate_gte_api_v2
     def update_detection_note(self, detection_id=None, note_id=None, note=""):
         """
         Set detection note
@@ -1227,21 +1139,20 @@ class VectraClientV2_5:
                 url=f"{self.url}/health",
                 params={"cache": cache, "vlans": vlans},
             )
-        else:
-            if check not in [
-                "network",
-                "system",
-                "memory",
-                "sensors",
-                "hostid",
-                "disk",
-                "cpu",
-                "power",
-                "connectivity",
-                "trafficdrop",
-            ]:
-                raise ValueError("Invalid check argument")
-            return self._request(method="get", url=f"{self.url}/health/{check}")
+        if check not in [
+            "network",
+            "system",
+            "memory",
+            "sensors",
+            "hostid",
+            "disk",
+            "cpu",
+            "power",
+            "connectivity",
+            "trafficdrop",
+        ]:
+            raise ValueError("Invalid check argument")
+        return self._request(method="get", url=f"{self.url}/health/{check}")
 
     # /hosts
     @staticmethod
@@ -1559,12 +1470,11 @@ class VectraClientV2_5:
         Get all defined proxies
         """
         if proxy_id:
-            deprecation(
+            warnings.deprecated(
                 'The "proxy_id" argument will be removed from this function, please use the get_proxy_by_id() function'
             )
             return self.get_proxy_by_id(proxy_id=proxy_id)
-        else:
-            return self._request(method="get", url=f"{self.url}/proxies")
+        return self._request(method="get", url=f"{self.url}/proxies")
 
     @validate_gte_api_v3_3
     def get_proxy_by_id(self, proxy_id=None):
@@ -1610,7 +1520,6 @@ class VectraClientV2_5:
 
         return _generate_params(args, valid_keys, deprecated_keys)
 
-    @validate_gte_api_v2
     def create_rule(
         self,
         detection_category=None,
@@ -1620,7 +1529,6 @@ class VectraClientV2_5:
         source_conditions=None,
         additional_conditions=None,
         json=None,
-        **kwargs,
     ):
         """
         Create triage rule
@@ -1717,7 +1625,6 @@ class VectraClientV2_5:
 
         return self._request(method="post", url=f"{self.url}/rules", json=payload)
 
-    @validate_gte_api_v2
     def delete_rule(self, rule_id=None, restore_detections=True):
         """
         Delete triage rule
@@ -1735,7 +1642,6 @@ class VectraClientV2_5:
             method="delete", url=f"{self.url}/rules/{rule_id}", params=params
         )
 
-    @validate_gte_api_v2
     def get_all_rules(self, **kwargs):
         """
         Generator to retrieve all rules page by page - all parameters are optional
@@ -1761,7 +1667,6 @@ class VectraClientV2_5:
 
         yield from self.yield_results(resp, method, params=params)
 
-    @validate_gte_api_v2
     def get_rule_by_id(self, rule_id, **kwargs):
         """
         Get triage rules by id
@@ -1788,17 +1693,19 @@ class VectraClientV2_5:
         For valid query params, see _generate_rule_params
         """
 
-        deprecation(
+        warnings.deprecated(
             "Some rules are no longer compatible with the APIv2, please switch to the APIv2.1"
         )
         if name:
-            deprecation(
-                'The "name" argument will be removed from this function, please use get_all_rules with the "contains" query parameter'
+            warnings.deprecated(
+                'The "name" argument will be removed from this function, please use get_all_rules'
+                ' with the "contains" query parameter'
             )
             return self.get_rules_by_name(triage_category=name)
         if rule_id:
-            deprecation(
-                'The "rule_id" argument will be removed from this function, please use the corresponding get_rule_by_id function'
+            warnings.deprecated(
+                'The "rule_id" argument will be removed from this function, please use the '
+                "corresponding get_rule_by_id function"
             )
             return self.get_rule_by_id(rule_id)
         return self._request(
@@ -1807,7 +1714,6 @@ class VectraClientV2_5:
             params=self._generate_rule_params(kwargs),
         )
 
-    @validate_gte_api_v2
     def get_rules_by_name(self, triage_category=None, description=None):
         """
         Get triage rules by name or description
@@ -1857,7 +1763,6 @@ class VectraClientV2_5:
 
         return response
 
-    @validate_gte_api_v2
     def mark_detections_fixed(self, detection_ids=None):
         """
         Mark detections as fixed
@@ -1867,7 +1772,6 @@ class VectraClientV2_5:
             raise ValueError("Must provide a list of detection IDs to mark as fixed")
         return self._toggle_detections_fixed(detection_ids, fixed=True)
 
-    @validate_gte_api_v2
     def unmark_detections_fixed(self, detection_ids=None):
         """
         Unmark detections as fixed
@@ -2246,7 +2150,6 @@ class VectraClientV2_5:
             method="post", url=f"{self.url}/tagging/host", json=payload
         )
 
-    @validate_gte_api_v2
     def get_account_tags(self, account_id=None):
         """
         Get Account tags
@@ -2256,7 +2159,6 @@ class VectraClientV2_5:
             method="get", url=f"{self.url}/tagging/account/{account_id}"
         )
 
-    @validate_gte_api_v2
     def get_detection_tags(self, detection_id=None):
         """
         Get detection tags
@@ -2266,7 +2168,6 @@ class VectraClientV2_5:
             method="get", url=f"{self.url}/tagging/detection/{detection_id}"
         )
 
-    @validate_gte_api_v2
     def set_account_tags(self, account_id=None, tags=None, append=False):
         """
         Set account tags
@@ -2347,7 +2248,6 @@ class VectraClientV2_5:
         """
         return self._request(method="delete", url=f"{self.url}/threatFeeds/{feed_id}")
 
-    @validate_gte_api_v2
     def get_feed_by_name(self, name=None):
         """
         Gets configured threat feed by name
@@ -2368,7 +2268,6 @@ class VectraClientV2_5:
         else:
             raise HTTPException(response)
 
-    @validate_gte_api_v2
     def get_feeds(self):
         """
         Gets list of currently configured threat feeds
@@ -2450,7 +2349,6 @@ class VectraClientV2_5:
                 )
         return params
 
-    @validate_gte_api_v2
     def get_detect_usage(self, **kwargs):
         """
         Get average monthly IP count for Detect
@@ -2596,6 +2494,7 @@ class VectraClientV2_5:
             f"{self.url}/vectra-match/available-devices",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2615,6 +2514,7 @@ class VectraClientV2_5:
             f"{self.url}/vectra-match/enablement?device_serial={device_serial}",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2645,6 +2545,7 @@ class VectraClientV2_5:
             headers=self.headers,
             json=payload,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2663,11 +2564,13 @@ class VectraClientV2_5:
                 f"{self.url}/vectra-match/status?device_serial={device_serial}",
                 headers=self.headers,
                 verify=self.verify,
+                timeout=self.timeout,
             )
         return requests.get(
             f"{self.url}/vectra-match/status",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2686,11 +2589,13 @@ class VectraClientV2_5:
                 f"{self.url}/vectra-match/stats?device_serial={device_serial}",
                 headers=self.headers,
                 verify=self.verify,
+                timeout=self.timeout,
             )
         return requests.get(
             f"{self.url}/vectra-match/stats",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2709,11 +2614,13 @@ class VectraClientV2_5:
                 f"{self.url}/vectra-match/alert-stats?device_serial={device_serial}",
                 headers=self.headers,
                 verify=self.verify,
+                timeout=self.timeout,
             )
         return requests.get(
             f"{self.url}/vectra-match/alert-stats",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2734,6 +2641,7 @@ class VectraClientV2_5:
             f"{self.url}/vectra-match/rules?uuid={uuid}",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2769,6 +2677,7 @@ class VectraClientV2_5:
             files={"file": rule_file},
             data=payload,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2792,6 +2701,7 @@ class VectraClientV2_5:
             headers=self.headers,
             json=payload,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2805,6 +2715,7 @@ class VectraClientV2_5:
             f"{self.url}/vectra-match/assignment",
             headers=self.headers,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2835,6 +2746,7 @@ class VectraClientV2_5:
             headers=self.headers,
             json=payload,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2865,6 +2777,7 @@ class VectraClientV2_5:
             headers=self.headers,
             json=payload,
             verify=self.verify,
+            timeout=self.timeout,
         )
 
     @request_error_handler
@@ -2891,7 +2804,6 @@ class VectraClientV2_5:
                     file.write(chunk)
         return resp
 
-    @validate_gte_api_v2
     def _toggle_detections_fixed(self, detection_ids, fixed):
         """
         Internal function to mark/unmark detections as fixed
@@ -3015,8 +2927,6 @@ class VectraClientV2_5:
 class ClientV2_latest(VectraClientV2_5):
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,

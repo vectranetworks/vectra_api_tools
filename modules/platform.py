@@ -11,7 +11,6 @@ import backoff
 import requests
 
 from vat.vectra import (
-    HTTPException,
     VectraClientV2_5,
     _generate_params,
 )
@@ -21,12 +20,10 @@ warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
 class CustomException(Exception):
     "Custom Exception raised while failure occurs."
-    pass
 
 
 class TooManyRequestException(Exception):
     "Custom Exception raised while requests exceeds."
-    pass
 
 
 def kill_process_and_exit(e):
@@ -38,8 +35,7 @@ def validate_lte_api_v3_4(func):
     def api_validator(self, *args, **kwargs):
         if self.version < 3.4:
             return func(self, *args, **kwargs)
-        else:
-            raise NotImplementedError("Method is not accessible via v3.4+ of API")
+        raise NotImplementedError("Method is not accessible via v3.4+ of API")
 
     return api_validator
 
@@ -51,13 +47,12 @@ class VectraPlatformClientV3(VectraClientV2_5):
 
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
         secret_key=None,
         verify=False,
+        timeout=180,
     ):
         """
         Initialize Vectra Platform client
@@ -65,6 +60,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         :param client_id: API Client ID for authentication - required
         :param secret_key: API Secret Key for authentication - required
         :param verify: Verify SSL (default: False) - optional
+        :param timeout: HTTP timeout in seconds (default 180)
         """
         super().__init__(
             url=url,
@@ -72,17 +68,21 @@ class VectraPlatformClientV3(VectraClientV2_5):
             secret_key=secret_key,
             token=token,
             verify=verify,
+            timeout=timeout,
         )
         self.token_headers = {
             "Content-Type": "application/x-www-form-urlencoded",
         }
         self._access = False
+        self._access_time = None
         self._check_token()
         self.verify = verify
         self.headers = {
             "Authorization": f"Bearer {self._access}",
             "Content-Type": "application/json",
         }
+        self._refresh = None
+        self._refresh_time = None
 
     def _sleep(self, timeout):
         time.sleep(timeout)
@@ -104,7 +104,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         Returns:
             str: Access Token
         """
-        resp = {}
+        resp = requests.Response()
         logging.info("Generating access token using refresh token.")
         try:
             resp = requests.post(
@@ -115,6 +115,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
                 },
                 headers=self.token_headers,
                 verify=self.verify,
+                timeout=self.timeout,
             )
             if resp.status_code == 401:
                 raise CustomException("Retrying to generate access token")
@@ -123,14 +124,16 @@ class VectraPlatformClientV3(VectraClientV2_5):
             resp.raise_for_status()
             logging.info("Access token is generated using refresh token.")
             self._access = resp.json().get("access_token")
-            self._accessTime = int(time.time()) + resp.json().get("expires_in") - 100
+            self._access_time = int(time.time()) + resp.json().get("expires_in") - 100
         except CustomException as e:
-            logging.error(f"Error occurred: {e}")
+            logging.error("Error occurred: %s", e)
             self._get_token()
-            raise CustomException
+            raise CustomException from e
         except TooManyRequestException as e:
             logging.info(
-                f"{e}. Retrying after {int(resp.headers.get('Retry-After'))} seconds."
+                "%s. Retrying after %i seconds.",
+                e,
+                int(resp.headers.get("Retry-After")),
             )
             time.sleep(int(resp.headers.get("Retry-After")))
             raise TooManyRequestException from e
@@ -139,10 +142,10 @@ class VectraPlatformClientV3(VectraClientV2_5):
             time.sleep(10)
             raise requests.exceptions.HTTPError
         except requests.exceptions.RequestException as req_exception:
-            logging.error(f"Retrying. An exception occurred: {req_exception}")
+            logging.error("Retrying. An exception occurred: %s", req_exception)
             raise requests.exceptions.RequestException from req_exception
         except Exception as e:
-            logging.error(f"An exception occurred: {e}")
+            logging.error("An exception occurred: %s", e)
 
     @backoff.on_exception(
         backoff.expo,
@@ -162,7 +165,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
         Returns:
             str: Access Token
         """
-        resp = {}
+        resp = requests.Response()
 
         logging.info("Generating access token.")
         try:
@@ -173,6 +176,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
                 headers=self.token_headers,
                 data={"grant_type": "client_credentials"},
                 verify=self.verify,
+                timeout=self.timeout,
             )
             if resp.status_code == 401:
                 raise CustomException(
@@ -189,17 +193,19 @@ class VectraPlatformClientV3(VectraClientV2_5):
                 logging.info("Access token is generated.")
                 self._access = resp.json().get("access_token")
                 self._refresh = resp.json().get("refresh_token")
-                self._accessTime = (
+                self._access_time = (
                     int(time.time()) + resp.json().get("expires_in") - 100
                 )
-                self._refreshTime = (
+                self._refresh_time = (
                     int(time.time()) + resp.json().get("refresh_expires_in") - 100
                 )
         except CustomException as e:
-            logging.error(f"Error occurred: {e}")
+            logging.error("Error occurred: %s", e)
         except TooManyRequestException as e:
             logging.info(
-                f"{e}. Retrying after {int(resp.headers.get('Retry-After'))} seconds."
+                "%s. Retrying after %i seconds.",
+                e,
+                int(resp.headers.get("Retry-After")),
             )
             time.sleep(int(resp.headers.get("Retry-After")))
             raise TooManyRequestException from e
@@ -209,15 +215,15 @@ class VectraPlatformClientV3(VectraClientV2_5):
             time.sleep(10)
             raise requests.exceptions.HTTPError
         except requests.exceptions.RequestException as req_exception:
-            logging.error(f"Retrying. An exception occurred: {req_exception}")
+            logging.error("Retrying. An exception occurred: %s", req_exception)
             raise requests.exceptions.RequestException from req_exception
         except Exception as e:
-            logging.error(f"An exception occurred: {e}")
+            logging.error("An exception occurred: %s", e)
 
     def _check_token(self):
         if not self._access:
             self._get_token()
-        elif self._accessTime < int(time.time()):
+        elif self._access_time < int(time.time()):
             self._refresh_token()
 
     def yield_event_results(self, resp, method, **kwargs):
@@ -517,7 +523,7 @@ class VectraPlatformClientV3(VectraClientV2_5):
 
         yield from self.yield_event_results(resp, method, **kwargs)
 
-    def get_audits(self, **kwargs):
+    def get_audits(self, **kwargs):  # pylint: disable=arguments-differ
         """
         Get audits
         :param event_timestamp_gte:
@@ -543,8 +549,6 @@ class VectraPlatformClientV3_1(VectraPlatformClientV3):
 
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
@@ -684,8 +688,6 @@ class VectraPlatformClientV3_2(VectraPlatformClientV3_1):
 
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
@@ -741,8 +743,6 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
 
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
@@ -1219,7 +1219,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
             method="get", url=self.url + "/vectra-match/download-vectra-ruleset"
         )
 
-        resp = requests.get(url=resp.json()["download_url"])
+        resp = requests.get(url=resp.json()["download_url"], timeout=self.timeout)
 
         with open(str(filename), "wb") as file:
             for chunk in resp.iter_content(chunk_size=8192):
@@ -1227,7 +1227,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
                     file.write(chunk)
         return resp
 
-    def upload_match_ruleset(self, **kwargs):
+    def upload_match_ruleset(self, **kwargs):  # pylint: disable=arguments-differ
         """
         Upload vectra-match rules
         :param file: name of ruleset desired to be uploaded (required)
@@ -1252,7 +1252,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
 
         # Upload the file to the provided url
         payload = open(f"{file_path}", "rb")
-        resp = requests.put(upload_url, data=payload)
+        resp = requests.put(upload_url, data=payload, timeout=self.timeout)
 
         if resp.status_code == 200:
             # Patch the request
@@ -1390,8 +1390,6 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
 
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
@@ -1560,7 +1558,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
         params = _generate_params(args, valid_keys, deprecated_keys)
         return params
 
-    def create_group(self, **kwargs):
+    def create_group(self, **kwargs):  # pylint: disable=arguments-differ
         if not (name := kwargs.get("name")):
             raise ValueError("Missing required parameter: name")
 
@@ -1570,7 +1568,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
 
         if members != [] and regex is not None:
             raise ValueError("Members cannot be specified when creating a regex group.")
-        elif members != []:
+        if members != []:
             regex = None
         elif regex is not None:
             members = []
@@ -1587,7 +1585,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             raise ValueError(
                 'parameter type must have value "account", "domain", "ip" or "host"'
             )
-        elif regex is not None and type not in ["host", "account"]:
+        if regex is not None and type not in ["host", "account"]:
             raise ValueError('parameter type must have value "account" or "host"')
         rules = kwargs.get("rules", [])
         if not isinstance(members, list):
@@ -1621,7 +1619,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             json=payload,
         )
 
-    def update_group(self, group_id=None, **kwargs):
+    def update_group(self, group_id=None, **kwargs):  # pylint: disable=arguments-differ
         group = self.get_group_by_id(group_id=group_id).json()
 
         if members := kwargs.get("members", []):
@@ -1629,8 +1627,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
                 raise ValueError(
                     "Members cannot be specified when updating a regex group."
                 )
-            else:
-                regex = None
+            regex = None
         elif regex := kwargs.get("regex"):
             pass
         else:
@@ -1691,27 +1688,26 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
                 url=f"{self.url}/health",
                 params={"cache": cache, "vlans": vlans},
             )
-        else:
-            if check not in [
-                "network",
-                "system",
-                "memory",
-                "sensors",
-                "hostid",
-                "disk",
-                "cpu",
-                "power",
-                "connectivity",
-                "trafficdrop",
-                "detection",
-                "external_connectors",
-                "external_connectors/details",
-                "edr",
-                "edr/details",
-                "network_brain/ping",
-            ]:
-                raise ValueError("Invalid check argument")
-            return self._request(method="get", url=f"{self.url}/health/{check}")
+        if check not in [
+            "network",
+            "system",
+            "memory",
+            "sensors",
+            "hostid",
+            "disk",
+            "cpu",
+            "power",
+            "connectivity",
+            "trafficdrop",
+            "detection",
+            "external_connectors",
+            "external_connectors/details",
+            "edr",
+            "edr/details",
+            "network_brain/ping",
+        ]:
+            raise ValueError("Invalid check argument")
+        return self._request(method="get", url=f"{self.url}/health/{check}")
 
     def get_user_roles(self):
         return self._request(
@@ -1719,7 +1715,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
             url=f"{self.url}/users/roles",
         )
 
-    def get_user_by_name(self, username=None, **kwargs):
+    def get_user_by_name(self, username=None):
         """
         :param username: Value contained in the name field.
         :rtype: dict
@@ -1767,7 +1763,7 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
 
         return self._request(method="post", url=f"{self.url}/users", json=payload)
 
-    def update_user(self, user_id=None, **kwargs):
+    def update_user(self, user_id=None, **kwargs):  # pylint: disable=arguments-differ
         roles = self.get_user_roles()
         standardized_names = [x["standardized_name"] for x in roles.json()]
         user = self.get_user_by_id(user_id=user_id).json()
@@ -1813,8 +1809,6 @@ class VectraPlatformClientV3_4(VectraPlatformClientV3_3):
 class ClientV3_latest(VectraPlatformClientV3_4):
     def __init__(
         self,
-        user=None,
-        password=None,
         token=None,
         url=None,
         client_id=None,
