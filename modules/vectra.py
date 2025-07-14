@@ -3687,10 +3687,11 @@ class VectraClientV2_5(VectraClientV2_4):
         verify=False,
     ):
         """
-        Initialize Vectra Platform client
+        Initialize Vectra client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
-        :param client_id: API Client ID for authentication - required
-        :param secret_key: API Secret Key for authentication - required
+        :param client_id: API Client ID for authentication for use with API Clients in v2.5+
+        :param secret_key: API Secret Key for authentication for use with API Clients in v2.5+
+        :param token: API token for authentication when using API v2.5 and lower
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
