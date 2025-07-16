@@ -19,9 +19,6 @@ from urllib3 import disable_warnings, exceptions
 disable_warnings(exceptions.InsecureRequestWarning)
 warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
-logging.basicConfig(format="%(levelname)s:%(name)s:%(lineno)d: %(message)s")
-
-
 class HTTPException(Exception):
     def __init__(self, response):
         """
@@ -77,8 +74,8 @@ class CustomException(HTTPException):
     pass
 
 
-def kill_process_and_exit(e):
-    logging.error("Exiting current process.")
+def kill_process_and_exit():
+    logging.error("Error obtaining access token. Exiting.")
     sys.exit()
 
 
@@ -3691,7 +3688,7 @@ class VectraClientV2_5(VectraClientV2_4):
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
         :param client_id: API Client ID for authentication for use with API Clients in v2.5+
         :param secret_key: API Secret Key for authentication for use with API Clients in v2.5+
-        :param token: API token for authentication when using API v2.5 and lower
+        :param token: API token for authentication when using API v2.5 and lower; will be ignored if client_id and secret_key are provided
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
