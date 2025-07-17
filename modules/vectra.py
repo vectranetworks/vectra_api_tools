@@ -3,18 +3,21 @@ import copy
 import html
 import ipaddress
 import json
+import logging
 import os
 import re
+import sys
+import time
 import warnings
 from math import ceil
 from pathlib import Path
 
+import backoff
 import requests
 from urllib3 import disable_warnings, exceptions
 
 disable_warnings(exceptions.InsecureRequestWarning)
 warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
-
 
 class HTTPException(Exception):
     def __init__(self, response):
@@ -63,6 +66,17 @@ class HTTPUnprocessableContentException(HTTPException):
 class HTTPTooManyRequestsException(HTTPException):
     def __init__(self, response):
         super().__init__(response)
+
+
+class CustomException(HTTPException):
+    "Custom Exception raised while failure occurs."
+
+    pass
+
+
+def kill_process_and_exit():
+    logging.error("Error obtaining access token. Exiting.")
+    sys.exit()
 
 
 def request_error_handler(func):
@@ -222,11 +236,22 @@ class VectraBaseClient(object):
             self.threads = threads
 
         url = _format_url(url)
-        if client_id and secret_key and self.VERSION3 is not None:
-            self.version = self.VERSION3
+        if client_id and secret_key:
+            self.token_headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+            }
+            self._access = False
+            self.verify = verify
             self.base_url = url
-            self.url = f"{self.base_url}/api/v{self.version}"
             self.auth = (client_id, secret_key)
+            if self.VERSION3 is not None:
+                self.version = self.VERSION3
+                self.auth_url = f"{self.base_url}/oauth2/token"
+            elif self.VERSION2 is not None and 3 > self.VERSION2 >= 2.5:
+                self.version = self.VERSION2
+                self.auth_url = f"{self.base_url}/api/v{self.version}/oauth2/token"
+            self.url = f"{self.base_url}/api/v{self.version}"
+            self._check_token()
 
         elif token and self.VERSION2 is not None:
             self.version = self.VERSION2
@@ -251,6 +276,150 @@ class VectraBaseClient(object):
                 "token for v2, "
                 "or username and password for v1."
             )
+
+    def _sleep(self, timeout):
+        time.sleep(timeout)
+
+    @backoff.on_exception(
+        backoff.expo,
+        (
+            requests.exceptions.RequestException,
+            HTTPTooManyRequestsException,
+            requests.exceptions.HTTPError,
+            CustomException,
+        ),
+        max_tries=5,
+        on_giveup=kill_process_and_exit,
+        max_time=60,
+    )
+    def _refresh_token(self):
+        """Generate access token for API authentication.
+        Returns:
+            str: Access Token
+        """
+        resp = {}
+        logging.info("Generating access token using refresh token.")
+        try:
+            resp = requests.post(
+                url=self.auth_url,
+                data={
+                    "grant_type": "refresh_token",
+                    "refresh_token": f"{self._refresh}",
+                },
+                headers=self.token_headers,
+                verify=self.verify,
+            )
+            if resp.status_code == 401:
+                raise CustomException("Retrying to generate access token")
+            if resp.status_code == 429:
+                raise HTTPTooManyRequestsException("Too many requests.")
+            resp.raise_for_status()
+            logging.info("Access token is generated using refresh token.")
+            self._access = resp.json().get("access_token")
+            self._accessTime = int(time.time()) + resp.json().get("expires_in") - 100
+        except CustomException as e:
+            logging.error(f"Error occurred: {e}")
+            self._get_token()
+            raise CustomException
+        except HTTPTooManyRequestsException as e:
+            logging.info(
+                f"{e}. Retrying after {int(resp.headers.get('Retry-After'))} seconds."
+            )
+            time.sleep(int(resp.headers.get("Retry-After")))
+            raise HTTPTooManyRequestsException from e
+        except requests.exceptions.HTTPError:
+            logging.error("Vectra API server is down. Retrying after 10 seconds.")
+            time.sleep(10)
+            raise requests.exceptions.HTTPError
+        except requests.exceptions.RequestException as req_exception:
+            logging.error(f"Retrying. An exception occurred: {req_exception}")
+            raise requests.exceptions.RequestException from req_exception
+        except Exception as e:
+            logging.error(f"An exception occurred: {e}")
+
+    @backoff.on_exception(
+        backoff.expo,
+        (
+            requests.exceptions.RequestException,
+            HTTPTooManyRequestsException,
+            requests.exceptions.HTTPError,
+            CustomException,
+        ),
+        max_tries=5,
+        on_giveup=kill_process_and_exit,
+        max_time=60,
+    )
+    def _get_token(self):
+        """Generate access token for API authentication.
+
+        Returns:
+            str: Access Token
+        """
+        resp = {}
+
+        logging.info("Generating access token.")
+        try:
+
+            resp = requests.post(
+                self.auth_url,
+                auth=self.auth,
+                headers=self.token_headers,
+                data={"grant_type": "client_credentials"},
+                verify=self.verify,
+            )
+            if resp.status_code == 401:
+                raise CustomException(
+                    f"Status-code {resp.status_code} Exception: Client ID or Client Secret is incorrect."
+                )
+            if resp.status_code == 405:
+                redirect = resp.request.url
+                self.base_url = "https://" + redirect.strip().split("/")[2]
+                self.url = f"{self.base_url}/api/v{self.version}"
+                self._get_token()
+            if resp.status_code == 429:
+                raise HTTPTooManyRequestsException("Too many requests.")
+            if resp.status_code == 200:
+                logging.info("Access token is generated.")
+                self._access = resp.json().get("access_token")
+                self._accessTime = (
+                    int(time.time()) + resp.json().get("expires_in") - 100
+                )
+                self.headers = {
+                    "Authorization": f"Bearer {self._access}",
+                    "Content-Type": "application/json",
+                }
+                if self.VERSION3 is not None:
+                    self._refresh = resp.json().get("refresh_token")
+                    self._refreshTime = (
+                        int(time.time()) + resp.json().get("refresh_expires_in") - 100
+                    )
+        except CustomException as e:
+            logging.error(f"Error occurred: {e}")
+        except HTTPTooManyRequestsException as e:
+            logging.info(
+                f"{e}. Retrying after {int(resp.headers.get('Retry-After'))} seconds."
+            )
+            time.sleep(int(resp.headers.get("Retry-After")))
+            raise HTTPTooManyRequestsException from e
+        except requests.exceptions.HTTPError as e:
+            print(e)
+            logging.error("Vectra API server is down. Retrying after 10 seconds.")
+            time.sleep(10)
+            raise requests.exceptions.HTTPError
+        except requests.exceptions.RequestException as req_exception:
+            logging.error(f"Retrying. An exception occurred: {req_exception}")
+            raise requests.exceptions.RequestException from req_exception
+        except Exception as e:
+            logging.error(f"An exception occurred: {e}")
+
+    def _check_token(self):
+        if not self._access:
+            self._get_token()
+        elif self._accessTime < int(time.time()):
+            if self.VERSION3 is not None:
+                self._refresh_token()
+            else:
+                self._get_token()
 
     def enable_debug(self):
         self._debug = True
@@ -3517,7 +3686,9 @@ class VectraClientV2_5(VectraClientV2_4):
         """
         Initialize Vectra client
         :param url: IP or hostname of Vectra brain (ex https://www.example.com) - required
-        :param token: API token for authentication when using API v2*
+        :param client_id: API Client ID for authentication for use with API Clients in v2.5+
+        :param secret_key: API Secret Key for authentication for use with API Clients in v2.5+
+        :param token: API token for authentication when using API v2.5 and lower; will be ignored if client_id and secret_key are provided
         :param verify: Verify SSL (default: False) - optional
         """
         super().__init__(
