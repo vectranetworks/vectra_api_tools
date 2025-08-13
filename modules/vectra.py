@@ -19,6 +19,7 @@ from urllib3 import disable_warnings, exceptions
 disable_warnings(exceptions.InsecureRequestWarning)
 warnings.filterwarnings("always", ".*", PendingDeprecationWarning)
 
+
 class HTTPException(Exception):
     def __init__(self, response):
         """
@@ -68,11 +69,13 @@ class HTTPTooManyRequestsException(HTTPException):
         super().__init__(response)
 
 
-class CustomException(HTTPException):
+class CustomException(Exception):
     "Custom Exception raised while failure occurs."
-
     pass
 
+class CustomTooManyRequestsException(CustomException):
+    "Custom Exception raised while failure occurs."
+    pass
 
 def kill_process_and_exit():
     logging.error("Error obtaining access token. Exiting.")
@@ -377,7 +380,7 @@ class VectraBaseClient(object):
                 self.url = f"{self.base_url}/api/v{self.version}"
                 self._get_token()
             if resp.status_code == 429:
-                raise HTTPTooManyRequestsException("Too many requests.")
+                raise CustomTooManyRequestsException("Too many requests.")
             if resp.status_code == 200:
                 logging.info("Access token is generated.")
                 self._access = resp.json().get("access_token")
@@ -395,12 +398,12 @@ class VectraBaseClient(object):
                     )
         except CustomException as e:
             logging.error(f"Error occurred: {e}")
-        except HTTPTooManyRequestsException as e:
+        except CustomTooManyRequestsException as e:
             logging.info(
                 f"{e}. Retrying after {int(resp.headers.get('Retry-After'))} seconds."
             )
             time.sleep(int(resp.headers.get("Retry-After")))
-            raise HTTPTooManyRequestsException from e
+            raise CustomTooManyRequestsException from e
         except requests.exceptions.HTTPError as e:
             print(e)
             logging.error("Vectra API server is down. Retrying after 10 seconds.")
