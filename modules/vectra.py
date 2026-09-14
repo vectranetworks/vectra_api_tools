@@ -1147,7 +1147,10 @@ class VectraBaseClient(object):
         """
         Internal function to mark/unmark detections as fixed
         """
-        payload = {"detectionIdList": detection_ids, "mark_as_fixed": str(fixed)}
+        payload = {
+            "detectionIdList": detection_ids,
+            "mark_as_fixed": fixed if self.version >= 3 else str(fixed),
+        }
 
         return self._request(method="patch", url=f"{self.url}/detections", json=payload)
 

@@ -717,21 +717,28 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
     @staticmethod
     def _generate_feed_params(args):
         """
+        Generate query parameters for threat feed queries
+        :param args: dict of query parameters
+        """
         valid_keys = [
             "category",
             "certainty",
             "expiration",
-            "lastUpdated",
-            "lastUpdatedBy",
+            "expiration_gte",
+            "expiration_lte",
+            "last_updated",
+            "last_updated_by",
+            "last_updated_gte",
+            "last_updated_lte",
             "name",
             "ordering",
             "page",
             "page_size",
         ]
 
-        Args:
-            args (_type_): _description_
-        """
+        deprecated_keys = []
+
+        return _generate_params(args, valid_keys, deprecated_keys)
 
     def get_entity_tags(self, entity_id=None, **kwargs):
         """
@@ -818,7 +825,7 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         As we do not want to return the complete entity body, we alter the response content
         """
         params = self._generate_entity_params(kwargs)
-        if "entity_type" or "type" not in params:
+        if "entity_type" not in params and "type" not in params:
             raise ValueError(
                 "Must provide entity_type or type('account','host','account,host')."
             )
@@ -1115,8 +1122,8 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param category: category that detection will register. supported values are lateral, exfil, and cnc
         :param certainty: certainty applied to detection. Supported values are Low, Medium, High
         :param expiration: Date feed expires ISO8601
-        :param lastUpdated: Date feed last updated ISO8601
-        :param lastUpdatedBy: By whom feed was last updated
+        :param last_updated: Date feed last updated ISO8601
+        :param last_updated_by: By whom feed was last updated
         :param name: name of threat feed
         :param ordering: field to use to order response
         :param page: Which page to return in multipage requests
@@ -1148,14 +1155,20 @@ class VectraPlatformClientV3_3(VectraPlatformClientV3_2):
         :param filename: Name of STIX file to be replaced on Threat feed
         :returns: request object
         """
-        feed_to_update = self.get_feed_by_name(name=name)
+        results = self.get_feed_by_name(name=name).json().get("results", [])
+
+        if not results:
+            raise ValueError(f"No threat feed found with name: {name}")
+
+        feed_to_update = results[0]
+        defaults = feed_to_update.get("defaults", {})
 
         feed_id = feed_to_update["id"]
 
-        category = kwargs.get("category", feed_to_update["category"])
-        certainty = kwargs.get("certainty", feed_to_update["certainty"])
-        itype = kwargs.get("itype", feed_to_update["itype"])
-        duration = kwargs.get("duration", feed_to_update["duration"])
+        category = kwargs.get("category", defaults.get("category"))
+        certainty = kwargs.get("certainty", defaults.get("certainty"))
+        itype = kwargs.get("itype", defaults.get("indicatorType"))
+        duration = kwargs.get("duration", defaults.get("duration"))
         replace_filename = kwargs.get("replace_filename", None)
         filename = kwargs.get("filename", None)
 
